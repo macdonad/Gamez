@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1319">
+<meta name="description" content="Embermark is a single-player idle RPG of gathering, crafting, dungeons, guilds and raids. It saves in your browser and runs offline.">
+<title>Embermark</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230e1319'/%3E%3Cpath d='M32 8l6 22h-12zM29 30h6v18h-6zM22 46h20v5H22z' fill='%23cba24f'/%3E%3C/svg%3E">
+<style>
+/* Layout: sticky header + activity strip, left rail nav on desktop (scrolling tab row on phones), card grids in the main pane, event log pinned under content. */
+:root{
+  --bg:#0e1319; --panel:#161e27; --panel2:#1d2732; --line:#2b3745;
+  --ink:#e8e2d2; --mute:#8f9aa6; --brass:#cba24f; --brass-d:#8d6e2c;
+  --hp:#b9473e; --xp:#4a8f86; --foe:#8e5aa8; --good:#6fae6a; --warn:#d09a3a;
+  --disp:Georgia,"Times New Roman",serif; --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:auto}
+body{background:var(--bg);color:var(--ink);font:16px/1.4 var(--body);padding-block:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+h1,h2,h3{font-family:var(--disp);margin:0;font-weight:700;letter-spacing:.04em;text-wrap:balance}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding-block:14px 10px}
+header h1{font-size:1.5rem;color:var(--brass)}
+header h1 small{display:block;font:500 .72rem var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.hud{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center}
+.hud .stat{display:flex;flex-direction:column;min-width:0}
+.hud .lab{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.hud .val{font-weight:700}
+.bar{height:10px;background:#0a0e13;border:1px solid var(--line);border-radius:3px;overflow:hidden;min-width:120px}
+.bar i{display:block;height:100%;width:0;background:var(--xp);transition:width .15s linear}
+.bar.hp i{background:var(--hp)}.bar.foe i{background:var(--foe)}.bar.gold i{background:var(--brass)}
+.strip{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brass);border-radius:4px;padding:10px 14px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,2fr) auto;gap:8px 16px;align-items:center}
+.strip .lbl{font-weight:700;overflow-wrap:anywhere}
+.strip .bars{display:grid;gap:6px;min-width:0}
+.strip .bars .row{display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--mute)}
+.strip .bars .bar{flex:1}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:6px 12px;font-weight:700;letter-spacing:.03em}
+.btn:hover:not(:disabled){border-color:var(--brass);color:var(--brass)}
+.btn.pri{background:var(--brass);color:#1a1405;border-color:var(--brass)}
+.btn.pri:hover:not(:disabled){background:#dcb560;color:#1a1405}
+.btn.pri:disabled{background:var(--panel2);color:var(--mute);border-color:var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:3px 9px;font-size:.85rem}
+.shell{display:grid;grid-template-columns:168px minmax(0,1fr);gap:20px;margin-top:16px;padding-bottom:max(32px,env(safe-area-inset-bottom,0px))}
+nav{display:flex;flex-direction:column;gap:4px;align-self:start;position:sticky;top:12px}
+nav button{text-align:left;background:none;border:1px solid transparent;border-radius:3px;padding:9px 12px;font-family:var(--disp);letter-spacing:.05em;color:var(--mute)}
+nav button:hover{color:var(--ink);background:var(--panel)}
+nav button[aria-current=true]{color:var(--brass);background:var(--panel);border-color:var(--line);border-left:3px solid var(--brass)}
+main{min-width:0;display:grid;gap:16px;align-content:start}
+.sec-title{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sec-title h2{font-size:1.15rem;color:var(--brass)}
+.sec-title p{margin:0;color:var(--mute);font-size:.9rem}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:8px 12px;display:grid;gap:5px;min-width:128px;text-align:left}
+.pill[aria-pressed=true]{border-color:var(--brass);background:var(--panel2)}
+.pill b{display:flex;justify-content:space-between;gap:10px}
+.pill .bar{min-width:0;height:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 14px;display:grid;gap:8px;align-content:start;min-width:0}
+.card.on{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass) inset}
+.card.lock{opacity:.55}
+.card h3{font-size:.98rem;display:flex;gap:8px;align-items:center;overflow-wrap:anywhere}
+.card h3 .ic{font-size:1.3rem}
+.meta{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--mute);font-size:.88rem}
+.meta b{color:var(--ink)}
+.ok{color:var(--good)}.bad{color:var(--hp)}.warn{color:var(--warn)}
+.tag{display:inline-block;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--brass-d);color:var(--brass);padding:0 6px;border-radius:2px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.table{display:grid;gap:6px}
+.trow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:7px 12px}
+.trow .nm{overflow-wrap:anywhere}
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.slot{border:1px dashed var(--line);border-radius:4px;padding:10px 12px;display:grid;gap:4px;background:var(--panel)}
+.slot .lab{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+#log{background:#0a0e13;border:1px solid var(--line);border-radius:4px;padding:10px 14px;height:140px;overflow-y:auto;font-size:.9rem;color:var(--mute);display:flex;flex-direction:column;gap:2px}
+#log .good{color:var(--good)}#log .warn{color:var(--warn)}#log .bad{color:var(--hp)}#log .gold{color:var(--brass)}
+.modal{position:fixed;inset:0;background:rgba(5,8,12,.82);display:grid;place-items:center;padding:16px;z-index:50;overflow-y:auto}
+.modal .box{background:var(--panel);border:1px solid var(--brass-d);border-radius:6px;padding:22px;max-width:620px;width:100%;display:grid;gap:14px}
+.modal h2{color:var(--brass)}
+.classes{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.classes button{text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:10px 12px;display:grid;gap:3px}
+.classes button:hover{border-color:var(--brass)}
+.classes b{font-family:var(--disp);color:var(--brass)}
+.classes span{font-size:.85rem;color:var(--mute)}
+textarea,input[type=text]{width:100%;background:#0a0e13;color:var(--ink);border:1px solid var(--line);border-radius:3px;padding:8px;font:inherit}
+textarea{min-height:70px;font-size:.8rem}
+ul.plain{margin:0;padding-left:18px}
+@media (max-width:780px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  nav{flex-direction:row;overflow-x:auto;position:static;padding-bottom:4px;gap:6px}
+  nav button{white-space:nowrap;border:1px solid var(--line)}
+  .strip{grid-template-columns:minmax(0,1fr)}
+  .trow{grid-template-columns:minmax(0,1fr) auto}
+}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+/* standalone page */
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;padding-top:env(safe-area-inset-top,0px)}
+#view{display:grid;gap:14px;min-width:0}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Embermark <small>An idle chronicle of the Ashen Realms</small></h1>
+    <div class="hud">
+      <div class="stat"><span class="lab">Gold</span><span class="val" id="hGold">0</span></div>
+      <div class="stat"><span class="lab">Combat</span><span class="val" id="hCl">1</span></div>
+      <div class="stat"><span class="lab">Health</span><div class="bar hp"><i id="hHp"></i></div></div>
+      <div class="stat"><span class="lab">Class</span><span class="val" id="hCls">-</span></div>
+    </div>
+  </header>
+  <section class="strip" aria-live="off">
+    <div class="lbl" id="sLbl">Idle</div>
+    <div class="bars">
+      <div class="row"><div class="bar" id="sB1w"><i id="sB1"></i></div><span id="sT1"></span></div>
+      <div class="row" id="sR2" hidden><div class="bar hp" id="sB2w"><i id="sB2"></i></div><span id="sT2"></span></div>
+    </div>
+    <button class="btn" id="sStop" data-do="stop" hidden>Stop</button>
+  </section>
+  <div class="shell">
+    <nav id="nav" aria-label="Sections"></nav>
+    <main>
+      <div id="view"></div>
+      <div id="log" role="log" aria-label="Event log"></div>
+    </main>
+  </div>
+</div>
+<div id="modal"></div>
+
+<script>
+(()=>{
+"use strict";
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+const fmt=n=>{n=Math.floor(n);const a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e4)return(n/1e3).toFixed(1)+'K';return n.toLocaleString();};
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- XP curve ---------- */
+const XT=[0,0];{let p=0;for(let l=1;l<100;l++){p+=Math.floor(l+300*Math.pow(2,l/7));XT[l+1]=Math.floor(p/4);}}
+const lvlOf=xp=>{let l=1;while(l<99&&xp>=XT[l+1])l++;return l;};
+const pct=(xp)=>{const l=lvlOf(xp);if(l>=99)return 100;return(xp-XT[l])/(XT[l+1]-XT[l])*100;};
+
+/* ---------- Items ---------- */
+const IT={};
+const mk=(name,icon,val,o={})=>{const id=slug(name);IT[id]={id,name,icon,val,...o};return id;};
+const TIERS=['Copper','Iron','Silverite','Aetherite','Starsteel'];
+const TL=[1,15,30,50,70];
+const SK=[];const ACT={};
+const gdef=(key,name,icon,ic,rows)=>{SK.push({key,name,icon,acts:rows.map(r=>{const id=mk(r[0],ic,r[4]);const a={kind:'gather',skill:key,id,name:r[0],lvl:r[1],sec:r[2],xp:r[3],out:id};ACT[id]=a;return a;})});};
+gdef('mining','Mining','⛏️','🪨',[['Copper Ore',1,3,6,2],['Iron Ore',15,3.5,16,6],['Silverite Ore',30,4,40,16],['Aetherite Ore',50,4.5,90,45],['Starsteel Ore',70,5,190,110]]);
+gdef('herbalism','Herbalism','🌿','🌱',[['Meadow Sage',1,3,6,2],['Bloodthorn',15,3.5,16,6],['Frostmint',30,4,40,16],['Dreamroot',50,4.5,90,45],['Sunpetal',70,5,190,110]]);
+gdef('fishing','Fishing','🎣','🐟',[['Silverfin',1,3,6,2],['Lake Trout',15,3.5,16,7],['Gloomeel',30,4,40,18],['Stormray',50,4.5,90,50],['Deepmaw Cod',70,5,190,120]]);
+gdef('skinning','Skinning','🔪','🟫',[['Rough Hide',1,3,6,3],['Thick Hide',15,3.5,16,9],['Heavy Hide',30,4,40,24],['Runed Hide',50,4.5,90,60],['Drake Hide',70,5,190,140]]);
+const rdef=(skill,name,icon,val,lvl,sec,xp,inn,o={})=>{const id=mk(name,icon,val,o);const r={kind:'craft',skill,id,name,lvl,sec,xp,in:inn,out:id};ACT[id]=r;return r;};
+const cook=[],alch=[],smith=[];
+const FOODS=['Grilled Silverfin','Trout Fillet','Gloomeel Stew','Stormray Steak','Deepmaw Feast'],FH=[25,60,120,220,380],CX=[8,22,55,120,260];
+const POTS=['Minor Healing Draught','Healing Draught','Greater Healing Draught','Superior Healing Draught','Grand Healing Draught'],PH=[30,75,150,280,480];
+const WA=[6,14,28,50,85],AD=[5,12,24,42,70],AH=[20,50,110,220,400],WV=[30,90,240,600,1500];
+for(let i=0;i<5;i++){
+  cook.push(rdef('cooking',FOODS[i],'🍲',Math.round(FH[i]/4),TL[i],3,CX[i],{[SK[2].acts[i].id]:1},{heal:FH[i]}));
+  alch.push(rdef('alchemy',POTS[i],'🧪',Math.round(PH[i]/3),TL[i],3.5,CX[i]+4,{[SK[1].acts[i].id]:2},{heal:PH[i]}));
+  const bar=rdef('smithing',TIERS[i]+' Bar','🔩',Math.round(WV[i]/12),TL[i],3,CX[i],{[SK[0].acts[i].id]:2});
+  smith.push(bar);
+  smith.push(rdef('smithing',TIERS[i]+' Blade','⚔️',WV[i],TL[i]+2,5,CX[i]*3,{[bar.id]:3},{slot:'weapon',atk:WA[i]}));
+  smith.push(rdef('smithing',TIERS[i]+' Plate','🛡️',WV[i],TL[i]+4,6,CX[i]*4,{[bar.id]:4,[SK[3].acts[i].id]:2},{slot:'armor',def:AD[i],hp:AH[i]}));
+}
+SK.push({key:'cooking',name:'Cooking',icon:'🍳',acts:cook},{key:'alchemy',name:'Alchemy',icon:'⚗️',acts:alch},{key:'smithing',name:'Blacksmithing',icon:'🔨',acts:smith});
+const SKM=Object.fromEntries(SK.map(s=>[s.key,s]));
+
+/* unique gear from dungeons and raids */
+const U={
+  hammer:mk("Delver's Hammer",'🔨',150,{slot:'weapon',atk:18}),lantern:mk('Lantern Charm','🏮',150,{slot:'trinket',atk:4,hp:40}),
+  fang:mk('Fangbiter','🗡️',600,{slot:'weapon',atk:36}),vest:mk('Gloomhide Vest','🧥',600,{slot:'armor',def:30,hp:70}),
+  staff:mk('Tidecaller Staff','🪄',2400,{slot:'weapon',atk:62}),seal:mk('Vault Seal','🔮',2400,{slot:'trinket',atk:15,def:15,hp:150}),
+  cleaver:mk('Spire Cleaver','🪓',9000,{slot:'weapon',atk:105}),aegis:mk('Obsidian Aegis','🛡️',9000,{slot:'armor',def:85,hp:300}),
+  edge:mk('Emberfall Edge','🗡️',6000,{slot:'weapon',atk:140}),crown:mk('Crown of Cinders','👑',6000,{slot:'trinket',atk:40,def:30,hp:400}),
+  reaver:mk('Frostbrand Reaver','⚔️',20000,{slot:'weapon',atk:200}),mantle:mk('Winter Mantle','🧣',20000,{slot:'armor',def:120,hp:600}),
+  maw:mk("Eater's Fang",'🦷',60000,{slot:'weapon',atk:300}),heart:mk('Heart of the Maw','❤️‍🔥',60000,{slot:'trinket',atk:90,def:60,hp:900})
+};
+
+/* ---------- Classes ---------- */
+const CL={
+  vanguard:{name:'Vanguard',d:'Sturdy front-liner. More defense and health.',atk:1,def:1.3,hp:1.25,crit:.06},
+  arcanist:{name:'Arcanist',d:'Glass cannon. Highest damage, thin armor.',atk:1.3,def:.85,hp:.9,crit:.1},
+  cleric:{name:'Cleric',d:'Mends wounds each round. Steady and forgiving.',atk:.9,def:1,hp:1.1,crit:.06,regen:.02},
+  shadowblade:{name:'Shadowblade',d:'Frequent critical strikes.',atk:1.15,def:.9,hp:1,crit:.25},
+  ranger:{name:'Ranger',d:'Balanced, with a little of everything.',atk:1.1,def:1,hp:1,crit:.12}
+};
+
+/* ---------- World data ---------- */
+const mon=(name,b,s)=>({name,hp:Math.round(b.hp*s),atk:Math.round(b.atk*Math.sqrt(s)),def:Math.round(b.def*s),xp:Math.round(b.xp*s),gold:Math.round(b.gold*s)});
+const ZB=[{hp:30,atk:4,def:2,xp:10,gold:4},{hp:120,atk:14,def:10,xp:35,gold:14},{hp:350,atk:32,def:28,xp:100,gold:40},{hp:900,atk:70,def:60,xp:260,gold:110},{hp:2200,atk:120,def:110,xp:650,gold:300}];
+const ZNAMES=[['Greenmeadow Fields',['Plains Wolf','Bandit Scout','Wild Boar']],['Duskwood Thicket',['Gloom Stag','Thornback Bear','Hollow Witch']],['Frostmaw Pass',['Rime Wolf','Ice Troll','Snow Wraith']],['Cinderwaste',['Ash Raider','Magma Hound','Emberwing Drake']],['Deepmaw Abyss',['Tide Horror','Abyssal Brute','Void Siren']]];
+const ZREQ=[1,10,25,45,65];
+const ZN=ZNAMES.map((z,i)=>({id:i,name:z[0],req:ZREQ[i],hide:SK[3].acts[i].id,mons:z[1].map((n,j)=>mon(n,ZB[i],[.8,1,1.3][j]))}));
+const dg=(id,name,req,trashNames,n,t,boss,loot,gxp,blurb)=>{const seq=[];for(let i=0;i<n;i++)seq.push({...t,name:trashNames[i%trashNames.length]});seq.push({...boss,boss:true});return{id,name,req,seq,loot,gxp,blurb};};
+const DG=[
+  dg(0,'Hollowmine Depths',5,['Tunnel Kobold','Cave Spider','Rock Gnawer'],4,{hp:70,atk:9,def:6,xp:20,gold:8},{name:'Gorrak the Tunnelmaster',hp:400,atk:18,def:12,xp:250,gold:120},[[U.hammer,.15],[U.lantern,.15]],60,'Abandoned dwarven shafts, now home to something that digs.'),
+  dg(1,'Gloomfang Keep',18,['Fang Cultist','Crypt Hound','Bone Sentry'],5,{hp:220,atk:24,def:18,xp:60,gold:20},{name:'Baron Vexmoor',hp:1500,atk:40,def:30,xp:900,gold:500},[[U.fang,.12],[U.vest,.12]],150,'A cursed fortress ruled by a baron who refuses to stay dead.'),
+  dg(2,'Sunken Vault of Ysmir',35,['Drowned Guard','Reef Stalker','Brine Caller'],6,{hp:600,atk:50,def:42,xp:150,gold:50},{name:'Ysmir, Tide-Tyrant',hp:5000,atk:80,def:65,xp:3500,gold:1500},[[U.staff,.1],[U.seal,.1]],400,'A treasury swallowed by the sea, still guarded by its drowned court.'),
+  dg(3,'Obsidian Spire',55,['Cinder Acolyte','Slag Golem','Spire Drake'],7,{hp:1400,atk:100,def:90,xp:380,gold:120},{name:'Malthar the Cinder Lord',hp:14000,atk:150,def:120,xp:12000,gold:5000},[[U.cleaver,.08],[U.aegis,.08]],900,'A black tower of volcanic glass. Nobody agrees on who built it.')
+];
+const RD=[
+  {id:0,name:'Emberfall Sanctum',size:5,cl:25,bosses:[
+    {name:'Ashwarden Keth',hp:4000,dps:20,xp:800,gold:900,gxp:500,loot:[[U.edge,.1],[U.crown,.08]]},
+    {name:'Matron Cinderveil',hp:7000,dps:30,xp:1400,gold:1600,gxp:700,loot:[[U.edge,.12],[U.crown,.1]]},
+    {name:'The Pyre Sovereign',hp:11000,dps:45,xp:2400,gold:3000,gxp:1000,loot:[[U.edge,.15],[U.crown,.15]]}]},
+  {id:1,name:'Throne of the Pale King',size:10,cl:50,bosses:[
+    {name:'Hrimgar Ironmaw',hp:30000,dps:90,xp:6000,gold:7000,gxp:1500,loot:[[U.reaver,.1],[U.mantle,.1]]},
+    {name:'The Rimebound Choir',hp:50000,dps:130,xp:9000,gold:11000,gxp:2000,loot:[[U.reaver,.12],[U.mantle,.12]]},
+    {name:'Aldric, the Pale King',hp:80000,dps:180,xp:15000,gold:20000,gxp:3000,loot:[[U.reaver,.15],[U.mantle,.15]]}]},
+  {id:2,name:"The Worldeater's Maw",size:15,cl:70,bosses:[
+    {name:'Gorgemother',hp:150000,dps:400,xp:30000,gold:40000,gxp:5000,loot:[[U.maw,.1],[U.heart,.1]]},
+    {name:'Ulthrax the Hollow',hp:250000,dps:550,xp:50000,gold:70000,gxp:7000,loot:[[U.maw,.12],[U.heart,.12]]},
+    {name:'Nyx-Thuul, Eater of Realms',hp:400000,dps:750,xp:90000,gold:130000,gxp:10000,loot:[[U.maw,.15],[U.heart,.15]]}]}
+];
+const HALL=[['barracks','Barracks','+2 roster slots per level'],['workshop','Workshop','+3% skill speed per level'],['library','Library','+3% XP per level'],['vault','Vault','+4% gold per level']];
+const NAMES=['Brindle','Kaelen','Mirabel','Tolgar','Sable','Orwyn','Vesper','Dunmar','Isolde','Garrick','Nym','Halric','Thessaly','Bram','Ysolt','Corvin','Lyra','Dagna','Fenwick','Ravenna','Ulric','Selwyn','Petra','Joren'];
+const ROLES={tank:'Tank',healer:'Healer',dps:'Damage'};
+
+/* ---------- State ---------- */
+const KEY='embermark-save-v1';
+const fresh=()=>({cls:null,xp:{mining:0,herbalism:0,fishing:0,skinning:0,cooking:0,alchemy:0,smithing:0,combat:0},inv:{},gold:0,eq:{weapon:null,armor:null,trinket:null},hp:null,act:null,prog:0,
+  guild:{name:'The Wayfarers',xp:0,members:[],hall:{barracks:0,workshop:0,library:0,vault:0}},stats:{kills:0,clears:{},raids:{}},seen:Date.now(),ui:{tab:'skills',skill:'mining'}});
+let S=fresh();
+try{const raw=localStorage.getItem(KEY);if(raw){const d=JSON.parse(raw);S=Object.assign(fresh(),d);S.xp=Object.assign(fresh().xp,d.xp);S.guild=Object.assign(fresh().guild,d.guild);S.guild.hall=Object.assign(fresh().guild.hall,(d.guild||{}).hall);S.ui=Object.assign(fresh().ui,d.ui);}}catch(e){}
+const save=()=>{S.seen=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
+let C={mon:null,acc:0},R={acc:0,t:0,pool:1,max:1,bhp:1,eat:0},dirty=false;
+
+/* ---------- Helpers ---------- */
+const have=id=>S.inv[id]||0;
+const add=(id,n=1)=>{S.inv[id]=have(id)+n;};
+const rem=(id,n=1)=>{S.inv[id]=have(id)-n;if(S.inv[id]<=0)delete S.inv[id];};
+const gl=()=>Math.min(30,lvlOf(S.guild.xp))-1;
+const xpMul=()=>1+.03*S.guild.hall.library+.01*gl();
+const goldMul=()=>1+.04*S.guild.hall.vault;
+const speed=()=>1+.03*S.guild.hall.workshop;
+const rosterCap=()=>5+2*S.guild.hall.barracks;
+const logEl=$('#log');
+function log(msg,cls=''){const d=document.createElement('div');if(cls)d.className=cls;d.textContent=msg;logEl.appendChild(d);while(logEl.children.length>60)logEl.firstChild.remove();logEl.scrollTop=logEl.scrollHeight;}
+function gainXp(sk,amt){const before=lvlOf(S.xp[sk]);S.xp[sk]+=amt*xpMul();const after=lvlOf(S.xp[sk]);if(after>before){log((sk==='combat'?'Combat':SKM[sk].name)+' reached level '+after+'!','good');dirty=true;}}
+function gainGold(g){const n=Math.round(g*goldMul());S.gold+=n;return n;}
+function pstats(){const c=CL[S.cls]||CL.ranger;const cl=lvlOf(S.xp.combat);let a=0,d=0,h=0;for(const s in S.eq){const it=IT[S.eq[s]];if(it){a+=it.atk||0;d+=it.def||0;h+=it.hp||0;}}
+  return{cl,atk:(4+cl*1.2+a)*c.atk,def:(2+cl*.8+d)*c.def,hp:Math.floor((60+cl*8+h)*c.hp),crit:c.crit,regen:c.regen||0};}
+function pickFood(missing){const f=Object.keys(S.inv).filter(id=>IT[id]&&IT[id].heal).sort((a,b)=>IT[a].heal-IT[b].heal);if(!f.length)return null;let best=null;for(const id of f)if(IT[id].heal<=missing)best=id;return best||f[0];}
+const roll=(list)=>{for(const[id,ch]of list)if(Math.random()<ch){add(id);log('Loot: '+IT[id].icon+' '+IT[id].name+'!','gold');}};
+
+/* ---------- Activities ---------- */
+function cycle(x){
+  if(x.in){for(const i in x.in)if(have(i)<x.in[i])return false;for(const i in x.in)rem(i,x.in[i]);}
+  add(x.out,1);gainXp(x.skill,x.xp);return true;
+}
+function startAct(a){S.act=a;S.prog=0;C={mon:null,acc:0};R.acc=0;if(a&&a.t==='raid')raidInit();render();}
+function spawn(){const a=S.act;let m;if(a.t==='zone'){const z=ZN[a.id];m=z.mons[Math.floor(Math.random()*z.mons.length)];}else m=DG[a.id].seq[a.i];C.mon={...m,mhp:m.hp};}
+function defeat(){log('You were defeated and wake at the shrine.','bad');S.act=null;S.hp=Math.floor(pstats().hp*.5);C={mon:null,acc:0};dirty=true;}
+function combatTick(){
+  const P=pstats();if(S.hp==null||S.hp>P.hp)S.hp=P.hp;if(!C.mon)spawn();const m=C.mon;let ate=false;
+  if(S.hp<P.hp*.5){const f=pickFood(P.hp-S.hp);if(f){rem(f);S.hp=Math.min(P.hp,S.hp+IT[f].heal);ate=true;log('Ate '+IT[f].name+'.','');}}
+  if(!ate){let d=P.atk*rnd(.75,1.25)*100/(100+m.def);if(Math.random()<P.crit)d*=1.8;m.mhp-=d;}
+  if(m.mhp<=0){
+    S.stats.kills++;gainXp('combat',m.xp);const g=gainGold(m.gold*rnd(.7,1.3));
+    if(S.act.t==='zone'){if(Math.random()<.3)add(ZN[S.act.id].hide);}
+    else{const d=DG[S.act.id];if(m.boss){log('Cleared '+d.name+'! +'+g+' gold','gold');S.guild.xp+=d.gxp;S.stats.clears[d.id]=(S.stats.clears[d.id]||0)+1;roll(d.loot);S.act.i=0;}else S.act.i++;}
+    C.mon=null;S.hp=Math.min(P.hp,S.hp+P.hp*P.regen);return;
+  }
+  const md=m.atk*rnd(.75,1.25)*100/(100+P.def);S.hp-=md;S.hp=Math.min(P.hp,S.hp+P.hp*P.regen);
+  if(S.hp<=0)defeat();
+}
+function comp(){const m=1+.3*gl();let dps=0,heal=0,hp=0,tanks=0;S.guild.members.forEach(x=>{if(x.role==='dps'){dps+=14*m;hp+=200*m;}else if(x.role==='healer'){heal+=30*m;hp+=200*m;}else{hp+=450*m;tanks++;}});return{dps,heal,hp,mit:Math.min(.4,tanks*.2)};}
+function raidInit(){const r=RD[S.act.id],b=r.bosses[S.act.b],c=comp();R.max=pstats().hp+c.hp;R.pool=R.max;R.bhp=b.hp;R.t=0;R.eat=0;}
+function raidTick(){
+  const r=RD[S.act.id],b=r.bosses[S.act.b],P=pstats(),c=comp();R.t++;
+  R.bhp-=P.atk*.6*(1+P.crit*.8)+c.dps;
+  if(R.bhp<=0){const g=gainGold(b.gold);gainXp('combat',b.xp);S.guild.xp+=b.gxp;log(b.name+' falls! +'+fmt(g)+' gold','gold');roll(b.loot);
+    S.act.b++;if(S.act.b>=r.bosses.length){S.act.b=0;S.stats.raids[r.id]=(S.stats.raids[r.id]||0)+1;log(r.name+' cleared!','good');}raidInit();dirty=true;return;}
+  R.eat--;if(R.pool<R.max*.45&&R.eat<=0){const f=pickFood(R.max-R.pool);if(f){rem(f);R.pool=Math.min(R.max,R.pool+IT[f].heal);R.eat=3;}}
+  const dmg=b.dps*(1+Math.max(0,R.t-120)*.02)*(1-c.mit);
+  R.pool=Math.min(R.max,R.pool-dmg+c.heal);
+  if(R.pool<=0){log('Wipe on '+b.name+'. The raid regroups at the entrance.','bad');S.act=null;dirty=true;}
+}
+function advance(ms){
+  const a=S.act;const P=pstats();
+  if(!a||a.t==='skill'||a.t==='raid'){if(S.hp==null)S.hp=P.hp;if(!a||a.t==='skill')S.hp=Math.min(P.hp,S.hp+ms/1000*P.hp*.02);}
+  if(!a)return;
+  if(a.t==='skill'){const x=ACT[a.id],dur=x.sec*1000/speed();S.prog+=ms;let n=Math.floor(S.prog/dur);S.prog-=n*dur;
+    while(n-->0){if(!cycle(x)){S.act=null;S.prog=0;dirty=true;log('Out of materials for '+x.name+'.','warn');break;}}}
+  else if(a.t==='zone'||a.t==='dungeon'){C.acc+=ms;let g=0;while(C.acc>=1500&&S.act&&g++<40000){C.acc-=1500;combatTick();}if(!S.act)C.acc=0;}
+  else if(a.t==='raid'){R.acc+=ms;while(R.acc>=1000&&S.act&&S.act.t==='raid'){R.acc-=1000;raidTick();}}
+}
+function snap(){return{gold:S.gold,inv:{...S.inv},lv:Object.fromEntries(Object.keys(S.xp).map(k=>[k,lvlOf(S.xp[k])]))};}
+function offline(ms){
+  ms=Math.min(ms,12*3600e3);const a=S.act;
+  if(a&&a.t==='raid'&&ms>600e3){S.act=null;log('The raid party disbanded while you were away.','warn');}
+  const b=snap();advance(ms);const e=snap();
+  if(ms<60e3)return;
+  const items=Object.keys(e.inv).map(id=>[id,e.inv[id]-(b.inv[id]||0)]).filter(x=>x[1]!==0&&IT[x[0]]);
+  const lv=Object.keys(e.lv).filter(k=>e.lv[k]>b.lv[k]).map(k=>(k==='combat'?'Combat':SKM[k].name)+' '+b.lv[k]+' → '+e.lv[k]);
+  const mins=Math.round(ms/60000);
+  modal(`<h2>Welcome back</h2><p>You were away for ${mins>=120?Math.round(mins/60)+' hours':mins+' minutes'}.</p>
+   <div class="meta"><span>Gold <b>${e.gold-b.gold>=0?'+':''}${fmt(e.gold-b.gold)}</b></span>${lv.map(x=>`<span class="ok">${x}</span>`).join('')}</div>
+   ${items.length?`<ul class="plain">${items.slice(0,14).map(([id,n])=>`<li>${IT[id].icon} ${IT[id].name} <b>${n>0?'+':''}${fmt(n)}</b></li>`).join('')}</ul>`:''}
+   <button class="btn pri" data-do="close">Continue</button>`);
+}
+
+/* ---------- Rendering ---------- */
+const TABS=[['skills','Skills'],['combat','Combat'],['dungeons','Dungeons'],['raids','Raids'],['guild','Guild'],['bank','Bank & Gear'],['save','Save']];
+function modal(html){$('#modal').innerHTML=`<div class="modal"><div class="box">${html}</div></div>`;}
+function renderNav(){$('#nav').innerHTML=TABS.map(([k,n])=>`<button data-tab="${k}" aria-current="${S.ui.tab===k}">${n}</button>`).join('');}
+const inLine=(i,n)=>`<span>${IT[i].icon} ${IT[i].name} <b data-b="in:${i}:${n}"></b></span>`;
+function actCard(x){
+  const lv=lvlOf(S.xp[x.skill]),lock=lv<x.lvl,on=S.act&&S.act.t==='skill'&&S.act.id===x.id,it=IT[x.out];
+  const t=(x.sec/speed()).toFixed(1);
+  return`<div class="card${on?' on':''}${lock?' lock':''}"><h3><span class="ic">${it.icon}</span>${it.name}</h3>
+   <div class="meta"><span>Level <b class="${lock?'bad':''}">${x.lvl}</b></span><span><b>${t}s</b></span><span><b>${x.xp}</b> XP</span>${it.heal?`<span>Heals <b>${it.heal}</b></span>`:''}${it.slot?`<span>${it.atk?'ATK <b>'+it.atk+'</b> ':''}${it.def?'DEF <b>'+it.def+'</b> ':''}${it.hp?'HP <b>+'+it.hp+'</b>':''}</span>`:''}<span>Sells <b>${it.val}</b></span></div>
+   ${x.in?`<div class="meta">${Object.entries(x.in).map(([i,n])=>inLine(i,n)).join('')}</div>`:''}
+   <div class="meta"><span>In bank <b data-b="have:${x.out}"></b></span></div>
+   ${on?`<div class="bar"><i data-bar="prog"></i></div><button class="btn" data-do="stop">Stop</button>`:`<button class="btn pri" data-do="skill" data-id="${x.id}" ${lock?'disabled':''}>${lock?'Locked':'Start'}</button>`}</div>`;
+}
+function vSkills(){
+  const cur=SKM[S.ui.skill];
+  return`<div class="sec-title"><h2>Skills</h2><p>Gather, then cook, brew and forge. Everything keeps running while you are away.</p></div>
+   <div class="pills">${SK.map(s=>`<button class="pill" data-do="pickskill" data-id="${s.key}" aria-pressed="${s.key===S.ui.skill}"><b><span>${s.icon} ${s.name}</span><span data-b="lvl:${s.key}"></span></b><div class="bar"><i data-bar="xp:${s.key}"></i></div></button>`).join('')}</div>
+   <div class="grid">${cur.acts.map(actCard).join('')}</div>`;
+}
+function statLine(){const P=pstats();return`<span>ATK <b>${Math.round(P.atk)}</b></span><span>DEF <b>${Math.round(P.def)}</b></span><span>HP <b>${P.hp}</b></span><span>Crit <b>${Math.round(P.crit*100)}%</b></span>`;}
+function vCombat(){
+  const P=pstats(),foods=Object.keys(S.inv).filter(i=>IT[i].heal);
+  return`<div class="sec-title"><h2>Combat</h2><p>You eat food automatically when health drops below half.</p></div>
+   <div class="card"><h3>${CL[S.cls]?CL[S.cls].name:''} · Combat level <span data-b="lvl:combat"></span></h3><div class="bar"><i data-bar="xp:combat"></i></div><div class="meta">${statLine()}<span>Kills <b>${fmt(S.stats.kills)}</b></span></div>
+   <div class="meta">${foods.length?foods.map(i=>`<span>${IT[i].icon} ${IT[i].name} <b data-b="have:${i}"></b></span>`).join(''):'<span class="warn">No food in the bank. Cook fish or brew potions.</span>'}</div></div>
+   <div class="grid">${ZN.map(z=>{const lock=P.cl<z.req,on=S.act&&S.act.t==='zone'&&S.act.id===z.id;
+    return`<div class="card${on?' on':''}${lock?' lock':''}"><h3>${z.name}</h3><div class="meta"><span>Combat level <b class="${lock?'bad':''}">${z.req}</b></span></div>
+     <div class="meta">${z.mons.map(m=>`<span>${m.name} <b>${m.hp}</b> HP</span>`).join('')}</div><div class="meta"><span>Drops ${IT[z.hide].icon} ${IT[z.hide].name}</span></div>
+     ${on?'<button class="btn" data-do="stop">Retreat</button>':`<button class="btn pri" data-do="zone" data-id="${z.id}" ${lock?'disabled':''}>${lock?'Locked':'Fight'}</button>`}</div>`;}).join('')}</div>`;
+}
+function vDungeons(){
+  const P=pstats();
+  return`<div class="sec-title"><h2>Dungeons</h2><p>A run is a chain of rooms ending in a boss. Clear one and it starts over.</p></div>
+   <div class="grid">${DG.map(d=>{const lock=P.cl<d.req,on=S.act&&S.act.t==='dungeon'&&S.act.id===d.id,boss=d.seq[d.seq.length-1];
+    return`<div class="card${on?' on':''}${lock?' lock':''}"><h3>${d.name}</h3><p style="margin:0;color:var(--mute);font-size:.9rem">${d.blurb}</p>
+     <div class="meta"><span>Combat level <b class="${lock?'bad':''}">${d.req}</b></span><span>Rooms <b>${d.seq.length}</b></span><span>Cleared <b>${S.stats.clears[d.id]||0}</b></span></div>
+     <div class="meta"><span>Boss <b>${boss.name}</b> · ${fmt(boss.hp)} HP</span></div>
+     <div class="meta">${d.loot.map(([i,c])=>`<span>${IT[i].icon} ${IT[i].name} <b>${Math.round(c*100)}%</b></span>`).join('')}</div>
+     ${on?`<div class="meta"><span>Room <b data-b="room"></b></span></div><button class="btn" data-do="stop">Leave</button>`:`<button class="btn pri" data-do="dungeon" data-id="${d.id}" ${lock?'disabled':''}>${lock?'Locked':'Enter'}</button>`}</div>`;}).join('')}</div>`;
+}
+function vRaids(){
+  const P=pstats(),n=S.guild.members.length+1,c=comp();
+  return`<div class="sec-title"><h2>Raids</h2><p>Lead your guild against a boss chain. Healers and a tank keep the party alive.</p></div>
+   <div class="card"><h3>Your party</h3><div class="meta"><span>Members <b>${n}</b></span><span>Damage <b>${Math.round(P.atk*.6*(1+P.crit*.8)+c.dps)}</b>/s</span><span>Healing <b>${Math.round(c.heal)}</b>/s</span><span>Party health <b>${fmt(P.hp+c.hp)}</b></span><span>Damage reduction <b>${Math.round(c.mit*100)}%</b></span></div></div>
+   <div class="grid">${RD.map(r=>{const lockCl=P.cl<r.cl,lockN=n<r.size,lock=lockCl||lockN,on=S.act&&S.act.t==='raid'&&S.act.id===r.id;
+    return`<div class="card${on?' on':''}${lock?' lock':''}"><h3>${r.name}</h3>
+     <div class="meta"><span>Party of <b class="${lockN?'bad':''}">${r.size}</b></span><span>Combat level <b class="${lockCl?'bad':''}">${r.cl}</b></span><span>Cleared <b>${S.stats.raids[r.id]||0}</b></span></div>
+     <ul class="plain" style="font-size:.9rem;color:var(--mute)">${r.bosses.map((b,i)=>`<li${on&&S.act.b===i?' style="color:var(--brass)"':''}>${b.name} · ${fmt(b.hp)} HP</li>`).join('')}</ul>
+     <div class="meta">${[...new Set(r.bosses.flatMap(b=>b.loot.map(l=>l[0])))].map(i=>`<span>${IT[i].icon} ${IT[i].name}</span>`).join('')}</div>
+     ${on?'<button class="btn" data-do="stop">Disband</button>':`<button class="btn pri" data-do="raid" data-id="${r.id}" ${lock?'disabled':''}>${lockN?'Needs '+(r.size-n)+' more members':lockCl?'Locked':'Start raid'}</button>`}</div>`;}).join('')}</div>`;
+}
+function vGuild(){
+  const g=S.guild,m=g.members,cost=Math.round(300*Math.pow(m.length+1,1.4)),full=m.length>=rosterCap()-1,lv=gl()+1,mm=1+.3*gl();
+  const cnt=r=>m.filter(x=>x.role===r).length;
+  return`<div class="sec-title"><h2>Guild</h2><p>Dungeon and raid bosses earn guild experience. Higher guild level strengthens every member.</p></div>
+   <div class="card"><label class="meta" for="gName">Guild name</label><input type="text" id="gName" maxlength="28" value="${esc(g.name)}">
+    <div class="meta"><span>Level <b>${lv}</b></span><span>XP bonus <b>+${gl()}%</b></span><span>Member strength <b>×${mm.toFixed(1)}</b></span><span>Roster <b>${m.length+1}/${rosterCap()}</b> (you included)</span></div><div class="bar"><i data-bar="gxp"></i></div></div>
+   <div class="cols"><div class="card"><h3>Recruit</h3><div class="meta"><span>Cost <b>${fmt(cost)}</b> gold</span><span>Tanks <b>${cnt('tank')}</b></span><span>Healers <b>${cnt('healer')}</b></span><span>Damage <b>${cnt('dps')}</b></span></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">${['tank','healer','dps'].map(r=>`<button class="btn pri" data-do="recruit" data-id="${r}" ${full||S.gold<cost?'disabled':''}>${ROLES[r]}</button>`).join('')}</div>${full?'<div class="warn">Roster full. Upgrade the Barracks.</div>':''}</div>
+    <div class="card"><h3>Roster</h3><div class="table">${m.length?m.map((x,i)=>`<div class="trow" style="grid-template-columns:minmax(0,1fr) auto auto"><span class="nm">${esc(x.name)}</span><span class="tag">${ROLES[x.role]}</span><button class="btn sm" data-do="kick" data-id="${i}">Dismiss</button></div>`).join(''):'<span style="color:var(--mute)">Nobody yet. Recruit a tank, a healer and some damage dealers.</span>'}</div></div></div>
+   <div class="grid">${HALL.map(([k,n,d])=>{const l=g.hall[k],c=Math.round(500*Math.pow(2,l)),max=l>=10;return`<div class="card"><h3>${n} <span class="tag">Lv ${l}</span></h3><div class="meta">${d}</div><button class="btn" data-do="hall" data-id="${k}" ${max||S.gold<c?'disabled':''}>${max?'Maxed':'Upgrade · '+fmt(c)+' gold'}</button></div>`;}).join('')}</div>`;
+}
+function vBank(){
+  const ids=Object.keys(S.inv).filter(i=>IT[i]).sort((a,b)=>(IT[b].slot?1:0)-(IT[a].slot?1:0)||IT[a].name.localeCompare(IT[b].name));
+  return`<div class="sec-title"><h2>Bank & Gear</h2><p>Gold <b class="warn" data-b="gold"></b></p></div>
+   <div class="slots">${['weapon','armor','trinket'].map(s=>{const it=IT[S.eq[s]];return`<div class="slot"><span class="lab">${s}</span>${it?`<b>${it.icon} ${it.name}</b><span class="meta">${it.atk?'ATK <b>'+it.atk+'</b> ':''}${it.def?'DEF <b>'+it.def+'</b> ':''}${it.hp?'HP <b>+'+it.hp+'</b>':''}</span><button class="btn sm" data-do="unequip" data-id="${s}">Unequip</button>`:'<span style="color:var(--mute)">Empty</span>'}</div>`;}).join('')}</div>
+   <div class="card"><div class="meta">${statLine()}</div></div>
+   <div class="table">${ids.length?ids.map(i=>{const it=IT[i];return`<div class="trow"><span class="nm">${it.icon} ${it.name} <b>×${fmt(S.inv[i])}</b>${it.slot?` <span class="tag">${it.slot}</span>`:''}${it.heal?` <span class="meta" style="display:inline">heals ${it.heal}</span>`:''}</span><span class="meta">${it.val}g</span>${it.slot?`<button class="btn sm" data-do="equip" data-id="${i}">Equip</button>`:'<span></span>'}<span style="display:flex;gap:6px"><button class="btn sm" data-do="sell1" data-id="${i}">Sell 1</button><button class="btn sm" data-do="sellall" data-id="${i}">Sell all</button></span></div>`;}).join(''):'<div class="card">The bank is empty. Start gathering.</div>'}</div>`;
+}
+function vSave(){return`<div class="sec-title"><h2>Save</h2><p>Progress saves in this browser automatically.</p></div>
+  <div class="card"><label class="meta" for="saveBox">Export or import</label><textarea id="saveBox" placeholder="Press Export to get your save code here, or paste one and press Import."></textarea>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-do="export">Export</button><button class="btn" data-do="import">Import</button><button class="btn" data-do="reset" id="resetBtn">Reset everything</button></div></div>`;}
+function render(){
+  renderNav();const v={skills:vSkills,combat:vCombat,dungeons:vDungeons,raids:vRaids,guild:vGuild,bank:vBank,save:vSave}[S.ui.tab]||vSkills;
+  $('#view').innerHTML=v();refresh();
+}
+
+/* ---------- Live bindings ---------- */
+function bval(k){const p=k.split(':');
+  switch(p[0]){
+    case'gold':return fmt(S.gold);
+    case'have':return fmt(have(p[1]));
+    case'in':{const h=have(p[1]),n=+p[2];return fmt(h)+'/'+n;}
+    case'lvl':return p[1]==='combat'?lvlOf(S.xp.combat):lvlOf(S.xp[p[1]]);
+    case'room':return S.act&&S.act.t==='dungeon'?(S.act.i+1)+'/'+DG[S.act.id].seq.length:'';
+  }return'';}
+function refresh(){
+  $$('[data-b]').forEach(e=>{const v=String(bval(e.dataset.b));if(e.textContent!==v){e.textContent=v;}if(e.dataset.b.startsWith('in:')){const p=e.dataset.b.split(':');e.className=have(p[1])>=+p[2]?'ok':'bad';}});
+  $$('[data-bar]').forEach(e=>{const p=e.dataset.bar.split(':');let w=0;
+    if(p[0]==='xp')w=pct(S.xp[p[1]]);else if(p[0]==='gxp')w=pct(S.guild.xp);
+    else if(p[0]==='prog'&&S.act&&S.act.t==='skill'){const x=ACT[S.act.id];w=S.prog/(x.sec*1000/speed())*100;}
+    e.style.width=Math.min(100,w)+'%';});
+  const P=pstats();if(S.hp==null)S.hp=P.hp;
+  $('#hGold').textContent=fmt(S.gold);$('#hCl').textContent=P.cl;$('#hCls').textContent=CL[S.cls]?CL[S.cls].name:'-';$('#hHp').style.width=Math.max(0,S.hp/P.hp*100)+'%';
+  const a=S.act,r2=$('#sR2');let lbl='Idle. Pick something to do.',b1=0,t1='',b2=0,t2='',two=false;
+  if(a){
+    if(a.t==='skill'){const x=ACT[a.id];lbl=(SKM[x.skill].icon)+' '+(x.in?'Crafting ':'Gathering ')+x.name;b1=S.prog/(x.sec*1000/speed())*100;t1=(x.sec/speed()).toFixed(1)+'s';}
+    else if(a.t==='zone'||a.t==='dungeon'){const m=C.mon;const nm=a.t==='zone'?ZN[a.id].name:DG[a.id].name+' · room '+(a.i+1)+'/'+DG[a.id].seq.length;lbl='⚔️ '+nm+(m?' · '+m.name:'');two=true;b1=m?Math.max(0,m.mhp/m.hp*100):100;t1=m?Math.max(0,Math.ceil(m.mhp))+'/'+m.hp:'';b2=S.hp/P.hp*100;t2=Math.ceil(Math.max(0,S.hp))+'/'+P.hp+' HP';}
+    else if(a.t==='raid'){const r=RD[a.id],b=r.bosses[a.b];lbl='🏰 '+r.name+' · '+b.name;two=true;b1=Math.max(0,R.bhp/b.hp*100);t1=fmt(Math.max(0,R.bhp))+' HP';b2=R.pool/R.max*100;t2='Party '+fmt(Math.max(0,R.pool))+'/'+fmt(R.max);}
+  }
+  $('#sLbl').textContent=lbl;$('#sB1').style.width=Math.min(100,b1)+'%';$('#sT1').textContent=t1;r2.hidden=!two;$('#sB2').style.width=Math.min(100,Math.max(0,b2))+'%';$('#sT2').textContent=t2;
+  $('#sB1w').className='bar'+(a&&a.t!=='skill'?' foe':'');$('#sStop').hidden=!a;
+}
+
+/* ---------- Input ---------- */
+document.addEventListener('click',e=>{
+  const tb=e.target.closest('[data-tab]');if(tb){S.ui.tab=tb.dataset.tab;render();return;}
+  const b=e.target.closest('[data-do]');if(!b||b.disabled)return;const id=b.dataset.id;
+  switch(b.dataset.do){
+    case'close':$('#modal').innerHTML='';break;
+    case'pickcls':S.cls=id;S.hp=pstats().hp;$('#modal').innerHTML='';log('You join the realm as a '+CL[id].name+'.','good');render();break;
+    case'pickskill':S.ui.skill=id;render();break;
+    case'skill':startAct({t:'skill',id});break;
+    case'stop':startAct(null);break;
+    case'zone':startAct({t:'zone',id:+id});break;
+    case'dungeon':startAct({t:'dungeon',id:+id,i:0});break;
+    case'raid':startAct({t:'raid',id:+id,b:0});break;
+    case'recruit':{const cost=Math.round(300*Math.pow(S.guild.members.length+1,1.4));if(S.gold>=cost&&S.guild.members.length<rosterCap()-1){S.gold-=cost;const used=S.guild.members.map(x=>x.name);const pool=NAMES.filter(n=>!used.includes(n));S.guild.members.push({name:(pool.length?pool:NAMES)[Math.floor(Math.random()*(pool.length||NAMES.length))],role:id});log('A new '+ROLES[id].toLowerCase()+' joins the guild.','good');}render();break;}
+    case'kick':S.guild.members.splice(+id,1);render();break;
+    case'hall':{const l=S.guild.hall[id],c=Math.round(500*Math.pow(2,l));if(S.gold>=c&&l<10){S.gold-=c;S.guild.hall[id]++;log('Guild hall upgraded.','good');}render();break;}
+    case'equip':{const it=IT[id],old=S.eq[it.slot];rem(id);if(old)add(old);S.eq[it.slot]=id;S.hp=Math.min(S.hp,pstats().hp);render();break;}
+    case'unequip':if(S.eq[id]){add(S.eq[id]);S.eq[id]=null;S.hp=Math.min(S.hp,pstats().hp);}render();break;
+    case'sell1':S.gold+=IT[id].val;rem(id);render();break;
+    case'sellall':S.gold+=IT[id].val*have(id);delete S.inv[id];render();break;
+    case'export':$('#saveBox').value=btoa(unescape(encodeURIComponent(JSON.stringify(S))));$('#saveBox').select();break;
+    case'import':try{const d=JSON.parse(decodeURIComponent(escape(atob($('#saveBox').value.trim()))));S=Object.assign(fresh(),d);C={mon:null,acc:0};save();render();log('Save imported.','good');}catch(err){log('That save code could not be read.','bad');}break;
+    case'reset':if(b.dataset.armed){try{localStorage.removeItem(KEY);}catch(er){}S=fresh();C={mon:null,acc:0};logEl.innerHTML='';render();pickClass();}else{b.dataset.armed='1';b.textContent='Click again to erase your save';}break;
+  }
+});
+document.addEventListener('change',e=>{if(e.target.id==='gName'){S.guild.name=e.target.value.trim()||'The Wayfarers';}});
+function pickClass(){modal(`<h2>Choose your calling</h2><p style="margin:0;color:var(--mute)">Your class shapes how you fight. Gathering and crafting are open to everyone.</p><div class="classes">${Object.entries(CL).map(([k,c])=>`<button data-do="pickcls" data-id="${k}"><b>${c.name}</b><span>${c.d}</span></button>`).join('')}</div>`);}
+
+/* ---------- Boot ---------- */
+if(!S.cls)pickClass();else{const away=Date.now()-S.seen;if(away>1000)offline(away);}
+render();
+if(!logEl.children.length)log('Welcome to Embermark. Start mining, fishing or herb gathering, then work toward dungeons and raids.');
+let last=Date.now();
+setInterval(()=>{const n=Date.now(),dt=n-last;last=n;if(!S.cls)return;if(dt>3000)offline(dt);else advance(dt);refresh();if(dirty){dirty=false;render();}},100);
+setInterval(save,5000);
+addEventListener('beforeunload',save);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)save();});
+})();
+</script>
+</body>
+</html>
