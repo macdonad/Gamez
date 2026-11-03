@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1417">
+<meta name="description" content="A fast solo war of villages. Build up, raid barbarians and take rival lords' villages with noblemen.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2312191c'/%3E%3Cpath d='M12 52V26h8v-6h6v6h4v-14h4v14h4v-6h6v6h8v26z' fill='%23d9aa4a'/%3E%3Cpath d='M28 52V40a4 4 0 018 0v12z' fill='%2312191c'/%3E%3C/svg%3E">
+<title>Marchlands</title>
+<style>
+/* Layout: war table. Resource strip on top, ledger tabs on the left, chart map and target dossier on the right. Single dark look by choice. */
+:root{color-scheme:dark;--ground:#0f1417;--panel:#171f24;--panel2:#1e292f;--line:#2c3a41;--ink:#e8e4d6;--mute:#8e9da3;--brass:#d9aa4a;--brass-ink:#1b1405;--wood:#c68f55;--clay:#d3734f;--iron:#8fb5cb;--good:#86ba6c;--bad:#ea684f;--warn:#e7b74f;--f-disp:Georgia,'Times New Roman',serif;--f-body:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--f-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+html,body{background:var(--ground);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.35;background:var(--ground);color:var(--ink)}
+#app{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 28px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--f-disp);font-size:30px;letter-spacing:.02em;color:var(--brass);line-height:1}
+.vsel{display:flex;flex-direction:column;min-width:0}
+.vsel b{font-size:16px}.vsel small{color:var(--mute)}
+.res{display:flex;flex-wrap:wrap;gap:8px;flex:1 1 380px;min-width:0}
+.chip{flex:1 1 104px;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 8px}
+.chip .l{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+.chip .v{font-family:var(--f-mono);font-size:16px}
+.chip .v small{color:var(--mute);font-size:11px}
+.meter{height:3px;background:var(--line);margin-top:3px}.meter i{display:block;height:100%}
+.ctl{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--brass);color:var(--brass-ink);border:0;border-radius:3px;padding:6px 12px;font-weight:700}
+.btn:hover{filter:brightness(1.1)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--brass);color:var(--brass)}
+.btn.on{border-color:var(--brass);color:var(--brass)}
+.btn.sm{padding:3px 9px;font-size:13px}
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+.clock{font-size:13px;color:var(--mute)}
+#alert{display:none;margin-top:10px;background:#2a1613;border:1px solid var(--bad);border-radius:4px;padding:8px 12px;color:#ffd9d1}
+#alert b{color:var(--bad)}
+.main{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;margin-top:14px;align-items:start}
+@media(max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--mute);font-weight:500}
+.tab.on{color:var(--brass);border-bottom-color:var(--brass)}
+.tab i{font-style:normal;background:var(--bad);color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:4px}
+#panel{padding-top:10px;min-width:0}
+.row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) auto;gap:8px 12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.row .nm b{font-size:16px}.row .nm small{display:block;color:var(--mute)}
+.lv{font-family:var(--f-mono);color:var(--brass)}
+.costs{display:flex;flex-wrap:wrap;gap:3px 10px;font-family:var(--f-mono);font-size:12px}
+.costs span.no{color:var(--bad)}
+.w{color:var(--wood)}.c{color:var(--clay)}.i{color:var(--iron)}
+.tag{display:inline-block;font-size:12px;color:var(--mute)}
+@media(max-width:560px){.row{grid-template-columns:minmax(0,1fr) auto}.row>.btn,.row>.qty,.row>.mono{grid-column:2;grid-row:1}.row>div:nth-child(2){grid-column:1/-1;grid-row:2}}
+.queue{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 10px;margin-bottom:6px}
+.qrow{display:grid;grid-template-columns:1fr auto auto;gap:2px 10px;align-items:center;padding:3px 0}
+.qrow .bar{grid-column:1/-1}
+.bar{height:4px;background:var(--line)}.bar i{display:block;height:100%;background:var(--brass)}
+.x{background:none;border:0;color:var(--mute);text-decoration:underline;font-size:12px}
+.qty{display:flex;gap:4px;align-items:center}
+input[type=number]{width:64px;background:var(--ground);border:1px solid var(--line);color:var(--ink);border-radius:3px;padding:4px 6px;font-family:var(--f-mono)}
+.stats{font-family:var(--f-mono);font-size:12px;color:var(--mute);display:flex;flex-wrap:wrap;gap:2px 10px}
+h3{font-family:var(--f-disp);font-weight:400;font-size:22px;margin:14px 0 4px;color:var(--brass);letter-spacing:.02em}
+h3:first-child{margin-top:4px}
+.mapbox{position:relative;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#0f1613;aspect-ratio:1/1;max-width:100%}
+#map{display:block;width:100%;cursor:crosshair}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mute);margin:6px 0}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;margin-right:5px;background:var(--lc);border-radius:2px}
+#target{margin-top:8px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px;min-width:0}
+#target h2{font-family:var(--f-disp);font-weight:400;font-size:26px;margin:0;line-height:1.1}
+.own{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;color:#10130f;font-weight:700;margin-left:6px;vertical-align:middle}
+.kv{display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0;color:var(--mute);font-size:13px}
+.kv b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.send{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0}
+.send label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--mute)}
+.send .in{display:flex;gap:4px;align-items:center}
+.send input{width:100%;min-width:0}
+.intel{background:var(--panel2);border-radius:3px;padding:6px 10px;font-size:13px;margin:6px 0}
+.rep{border-bottom:1px solid var(--line);padding:8px 0}
+.rep summary,.rep .hd{cursor:pointer;display:flex;gap:8px;align-items:baseline;justify-content:space-between}
+.rep .hd b.win{color:var(--good)}.rep .hd b.loss{color:var(--bad)}.rep .hd b.neu{color:var(--iron)}
+.rep.unread .hd span:first-child::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brass);margin-right:7px}
+.rep .body{margin:6px 0 2px;font-size:13px;color:var(--mute);display:grid;gap:3px}
+.rep .body b{color:var(--ink);font-weight:500}
+.empty{color:var(--mute);padding:14px 0}
+#toasts{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;z-index:20;max-width:min(340px,calc(100vw - 24px))}
+.toast{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--brass);padding:7px 11px;border-radius:3px;font-size:14px;animation:in .2s ease-out}
+.toast.bad{border-left-color:var(--bad)}.toast.good{border-left-color:var(--good)}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#overlay{position:fixed;inset:0;background:rgba(8,11,13,.93);z-index:30;display:none;align-items:center;justify-content:center;padding:20px;overflow:auto}
+#overlay.on{display:flex}
+.card{max-width:520px;width:100%;background:var(--panel);border:1px solid var(--line);padding:26px;border-radius:4px}
+.card h1{font-family:var(--f-disp);font-weight:400;font-size:54px;color:var(--brass);margin:0;line-height:1}
+.card p{color:var(--ink)}
+.card ul{color:var(--mute);padding-left:18px;margin:8px 0 16px}
+.card .ctl{margin:10px 0}
+#scene{margin-bottom:12px;min-width:0}
+.scene{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:4px;background:#14221a}
+.sl{font:500 11px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#a9b6bb}
+.sn{fill:#d9aa4a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.sq{fill:#e7b74f;animation:pulse 1.4s ease-in-out infinite}
+.splot{fill:none;stroke:#3e4d44;stroke-width:1.5;stroke-dasharray:4 4}
+@keyframes pulse{50%{opacity:.35}}
+.smk{opacity:0;animation:rise 4.2s ease-out infinite}.smk.s2{animation-delay:1.4s}.smk.s3{animation-delay:2.8s}
+@keyframes rise{0%{opacity:0;transform:translate(0,0) scale(.5)}15%{opacity:.5}100%{opacity:0;transform:translate(7px,-26px) scale(1.7)}}
+.smk{transform-box:fill-box;transform-origin:center}
+.flagw{transform-box:fill-box;transform-origin:left center;animation:wave 2.2s ease-in-out infinite}
+@keyframes wave{50%{transform:skewY(5deg) scaleX(.93)}}
+.flick{transform-box:fill-box;transform-origin:bottom center;animation:flick .5s ease-in-out infinite alternate}
+@keyframes flick{to{transform:scale(.8,1.15)}}
+.garr{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;margin-top:6px;font-family:var(--f-mono);font-size:13px}
+.ic{width:1.15em;height:1.15em;vertical-align:-.2em;flex:none}
+.uc{display:inline-flex;align-items:center;gap:4px;margin-right:6px;white-space:nowrap}
+.ic-spear,.ic-sword{color:var(--iron)}.ic-axe,.ic-cav{color:var(--clay)}.ic-scout{color:var(--good)}.ic-noble{color:var(--brass)}
+.bi{width:20px;height:20px;margin-right:7px;vertical-align:-4px;color:var(--brass)}
+.bi.ic-spear,.bi.ic-sword{color:var(--iron)}.bi.ic-axe,.bi.ic-cav{color:var(--clay)}.bi.ic-scout{color:var(--good)}
+@media(prefers-reduced-motion:reduce){.toast{animation:none}.sq,.smk,.flagw,.flick{animation:none}.smk{opacity:.25}}
+</style>
+
+<style>html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div id="app">
+ <div class="top">
+  <div class="brand">Marchlands</div>
+  <div class="vsel"><b id="vname"></b><small id="vsub"></small></div>
+  <div class="res" id="res"></div>
+  <div class="ctl">
+   <button class="btn ghost sm" data-act="pause" id="bpause">Pause</button>
+   <button class="btn ghost sm" data-act="speed" data-v="1">1x</button>
+   <button class="btn ghost sm" data-act="speed" data-v="2">2x</button>
+   <button class="btn ghost sm" data-act="speed" data-v="4">4x</button>
+   <button class="btn ghost sm" data-act="menu">Menu</button>
+  </div>
+  <div class="clock mono" id="clock"></div>
+ </div>
+ <div id="alert"></div>
+ <div class="main">
+  <section>
+   <div id="scene"></div>
+   <div class="tabs" id="tabs"></div>
+   <div id="panel"></div>
+  </section>
+  <section>
+   <div class="mapbox"><canvas id="map"></canvas></div>
+   <div class="legend" id="legend"></div>
+   <div id="target"></div>
+  </section>
+ </div>
+</div>
+<div id="toasts"></div>
+<div id="overlay"><div class="card" id="card"></div></div>
+<script>
+
+'use strict';
+const $=s=>document.querySelector(s);
+const rnd=(a,b)=>a+Math.random()*(b-a), ri=(a,b)=>Math.floor(rnd(a,b+1)), pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const SAVE='marchlands.save.v1', MAP=26, RES=['w','c','i'];
+const DIFF=[{n:'Easy',mult:.9,grace:600,rate:.7},{n:'Normal',mult:1.2,grace:420,rate:.85},{n:'Hard',mult:1.6,grace:300,rate:1.1}];
+const LORDS=[{name:'You',color:'#e3b04b'},{name:'Lord Varrick',color:'#e0634b',p:'raider'},{name:'Dame Orsolya',color:'#5b9bdc',p:'builder'},{name:'Baron Hesk',color:'#a57be0',p:'warlord'},{name:'Lady Ilvane',color:'#46bfa6',p:'raider'}];
+const BARB='#8b918d';
+const NAMES=['Ashford','Blackmere','Cinderholt','Dunmoor','Eastwatch','Fallowgate','Greywick','Harrowdene','Ironvale','Jarlsby','Kettlefen','Lowmarsh','Mirewood','Northcairn','Oakhollow','Pinesend','Quarrel','Ravenhill','Stonebridge','Thornby','Underhill','Vexley','Wolfsden','Yarrow','Zennor','Brackwater','Coldharbour','Dreadfen','Elmstead','Frostholm','Gallows Rise','Hollin','Imber','Kingsmoor','Larkspur','Marrow','Nethercott','Ormside','Pellar','Rookery','Saltmarsh','Tamsin','Ulwick','Wend'];
+const U={
+ spear:{n:'Spearman',c:[50,30,10],pop:1,t:8,a:10,d:25,carry:25,sp:.4,b:'barracks'},
+ sword:{n:'Swordsman',c:[30,30,70],pop:1,t:11,a:25,d:50,carry:15,sp:.38,b:'barracks'},
+ axe:{n:'Axeman',c:[60,30,40],pop:1,t:10,a:40,d:10,carry:10,sp:.4,b:'barracks'},
+ scout:{n:'Scout',c:[30,30,30],pop:2,t:12,a:0,d:2,carry:0,sp:1.2,b:'stable'},
+ cav:{n:'Light Cavalry',c:[125,100,250],pop:4,t:22,a:130,d:30,carry:80,sp:.9,b:'stable'},
+ noble:{n:'Nobleman',c:[500,550,500],pop:6,t:30,a:30,d:100,carry:0,sp:.28,b:'academy'}
+};
+const B={
+ hq:{n:'Headquarters',c:[90,80,70],t:12,max:20},
+ timber:{n:'Timber Camp',c:[50,60,40],t:8,max:25,r:'w'},
+ clay:{n:'Clay Pit',c:[65,50,40],t:8,max:25,r:'c'},
+ iron:{n:'Iron Mine',c:[75,65,70],t:8,max:25,r:'i'},
+ warehouse:{n:'Warehouse',c:[60,50,40],t:9,max:20},
+ farm:{n:'Farm',c:[80,100,70],t:10,max:20},
+ barracks:{n:'Barracks',c:[200,170,90],t:18,max:15,req:{hq:2}},
+ stable:{n:'Stable',c:[270,240,260],t:30,max:10,req:{barracks:2}},
+ wall:{n:'Wall',c:[50,100,20],t:14,max:15},
+ academy:{n:'Academy',c:[600,700,600],t:60,max:1,req:{hq:5,barracks:3}}
+};
+let S=null,cur=0,speed=1,paused=false,selId=null,tab='build',openRep=null,running=false;
+const draft={send:{},train:{}};
+
+const V=id=>S.vs[id];
+const cost=(k,L)=>B[k].c.map(x=>Math.round(x*Math.pow(1.26,L-1)));
+const btime=(v,k,L)=>Math.max(3,B[k].t*Math.pow(1.2,L-1)*Math.pow(.93,v.b.hq-1));
+const prodAt=L=>L<=0?.4:1.9*Math.pow(1.17,L-1);
+const wcap=v=>Math.round(1000*Math.pow(1.23,v.b.warehouse-1));
+const fcap=v=>Math.round(130*Math.pow(1.22,v.b.farm));
+const utime=(v,u)=>U[u].t*Math.pow(.93,v.b[U[u].b]-1);
+const mult=v=>v.owner>0?DIFF[S.diff].mult:v.owner===0?1:.6;
+const rate=(v,r)=>prodAt(v.b[{w:'timber',c:'clay',i:'iron'}[r]])*mult(v);
+const unitsPop=us=>Object.entries(us).reduce((s,[u,n])=>s+U[u].pop*n,0);
+const sumN=us=>Object.values(us).reduce((s,n)=>s+n,0);
+const attPower=us=>Object.entries(us).reduce((s,[u,n])=>s+U[u].a*n,0);
+const defPower=(v,tr=v.troops)=>Object.entries(tr).reduce((s,[u,n])=>s+U[u].d*n,0)*(1+.07*v.b.wall)+15+5*v.b.wall;
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const afford=(v,c)=>v.res.w>=c[0]&&v.res.c>=c[1]&&v.res.i>=c[2];
+const pay=(v,c)=>{v.res.w-=c[0];v.res.c-=c[1];v.res.i-=c[2]};
+const pts=v=>Object.values(v.b).reduce((s,n)=>s+n,0)*10;
+const lordOf=o=>o>=0?S.lords[o]:{name:'Barbarians',color:BARB};
+const fmt=n=>n>=10000?(n/1000).toFixed(1)+'k':Math.floor(n).toLocaleString('en');
+const tm=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+function popUsed(v){let p=unitsPop(v.troops);for(const q of Object.values(v.tq))for(const it of q)p+=U[it.u].pop*it.n;for(const m of S.moves)if(m.home===v.id)p+=unitsPop(m.units);return p}
+function travel(a,b,us){let sp=9,any=false;for(const u in us)if(us[u]>0){any=true;sp=Math.min(sp,U[u].sp)}if(!any)sp=.7;return Math.max(1,dist(a,b))/sp}
+
+function toast(msg,kind){const el=document.createElement('div');el.className='toast '+(kind||'');el.textContent=msg;const box=$('#toasts');box.appendChild(el);while(box.children.length>4)box.firstChild.remove();setTimeout(()=>el.remove(),5000)}
+
+function mkVillage(p,owner,lvl,name){
+ const b={hq:1,timber:1,clay:1,iron:1,warehouse:1,farm:1,barracks:0,stable:0,wall:0,academy:0};
+ const v={id:S.vs.length,name,x:p.x,y:p.y,owner,b,res:{w:0,c:0,i:0},troops:{},bq:[],tq:{barracks:[],stable:[],academy:[]},loyalty:100,lvl:lvl||0,bt:rnd(4,12),aiT:rnd(1,4),atkT:rnd(50,90)};
+ if(owner===0){b.timber=b.clay=b.iron=2;b.barracks=1;v.res={w:500,c:500,i:450};v.troops={spear:8,axe:10}}
+ else if(owner>0){b.timber=b.clay=b.iron=S.diff===0?2:3;b.hq=2;b.warehouse=2;b.farm=2;b.wall=1;b.barracks=1;v.res={w:400,c:400,i:350};v.troops={spear:10,axe:6}}
+ else{const L=lvl,j=()=>ri(-1,1);b.timber=Math.max(1,Math.round(1+L*1.2)+j());b.clay=Math.max(1,Math.round(1+L*1.2)+j());b.iron=Math.max(1,Math.round(1+L*1.2)+j());b.warehouse=2+Math.ceil(L/2);b.wall=Math.max(0,Math.floor(L/2)+j());b.hq=2+Math.floor(L/2);b.farm=2+L;b.barracks=L>=2?1+Math.floor(L/3):0;b.stable=L>=4?1:0;
+  const n=2+L*5;v.troops={spear:Math.round(n*.7),sword:Math.round(n*.3)};const cp=wcap(v);v.res={w:rnd(.2,.7)*cp,c:rnd(.2,.7)*cp,i:rnd(.2,.7)*cp}}
+ S.vs.push(v);return v}
+
+function newGame(d){
+ const names=shuffle([...NAMES]);
+ S={v:1,t:0,diff:d,lords:LORDS.map((l,i)=>({id:i,...l,alive:true})),vs:[],moves:[],reports:[],intel:{},nid:1,over:null,stats:{raids:0,taken:0,lost:0}};
+ const spots=[];const free=(x,y,m)=>spots.every(s=>Math.hypot(s.x-x,s.y-y)>=m);
+ const place=(m,x0,x1,y0,y1)=>{for(let k=0;k<600;k++){const x=ri(x0,x1),y=ri(y0,y1);if(free(x,y,m)){spots.push({x,y});return{x,y}}}return null};
+ const hp=place(3,10,15,10,15);mkVillage(hp,0,0,names.pop());
+ [[2,6,2,6],[19,23,2,6],[2,6,19,23],[19,23,19,23]].forEach((q,i)=>mkVillage(place(3,...q),i+1,0,names.pop()));
+ for(let k=0;k<26;k++){const p=place(2.2,1,MAP-2,1,MAP-2);if(!p)continue;
+  const L=Math.max(1,Math.min(6,Math.round(dist(p,hp)/3.6+rnd(-.8,.8))));mkVillage(p,-1,L,names.pop()||'Ruin '+k)}
+ cur=0;selId=null;openRep=null;tab='build'}
+
+function canBuild(v,k){const L=v.b[k]+v.bq.filter(q=>q.k===k).length+1;if(L>B[k].max)return'Max level';const rq=B[k].req;if(rq)for(const r in rq)if(v.b[r]<rq[r])return`Needs ${B[r].n} ${rq[r]}`;return null}
+function enqueueBuild(v,k,max=2){if(v.bq.length>=max)return'Queue full';const e=canBuild(v,k);if(e)return e;const L=v.b[k]+v.bq.filter(q=>q.k===k).length+1;const c=cost(k,L);if(!afford(v,c))return'Not enough resources';pay(v,c);const t=btime(v,k,L);v.bq.push({k,L,t,tot:t});return null}
+function enqueueTrain(v,u,n){n=Math.floor(n);if(!(n>=1))return'Enter a number';const bk=U[u].b;if(v.b[bk]<1)return'Needs '+B[bk].n;const q=v.tq[bk];if(q.length>=4)return'Queue full';const c=U[u].c.map(x=>x*n);if(!afford(v,c))return'Not enough resources';if(popUsed(v)+U[u].pop*n>fcap(v))return'Farm is full';pay(v,c);q.push({u,n,t:utime(v,u)});return null}
+
+function simVillage(v,dt){
+ const cp=wcap(v);
+ for(const r of RES)if(v.res[r]<cp)v.res[r]=Math.min(cp,v.res[r]+rate(v,r)*dt);
+ if(v.bq.length){const q=v.bq[0];q.t-=dt;if(q.t<=0){v.b[q.k]=q.L;v.bq.shift();if(v.owner===0)toast(`${B[q.k].n} is now level ${q.L} in ${v.name}`,'good')}}
+ for(const bk in v.tq){const q=v.tq[bk];if(!q.length)continue;const it=q[0];it.t-=dt;
+  while(it.t<=0&&it.n>0){v.troops[it.u]=(v.troops[it.u]||0)+1;it.n--;it.t+=utime(v,it.u)}
+  if(it.n<=0){q.shift();if(v.owner===0)toast(`${U[it.u].n} training finished in ${v.name}`,'good')}}
+ if(v.loyalty<100)v.loyalty=Math.min(100,v.loyalty+.04*dt);
+ if(v.owner===-1){v.bt-=dt;if(v.bt<=0){v.bt=rnd(9,16);const cap=(6+v.lvl*8)*(1+Math.min(S.t,1800)/1200);if(unitsPop(v.troops)<cap){const u=Math.random()<.6?'spear':'sword';v.troops[u]=(v.troops[u]||0)+1}}}
+}
+
+const clean=us=>{const o={};for(const u in us)if(us[u]>0)o[u]=us[u];return o};
+const sub=(a,b)=>{const o={};for(const u in a){const d=a[u]-(b[u]||0);if(d>0)o[u]=d}return o};
+
+function sendMove(from,to,units,kind){
+ const us=clean(units);
+ S.moves.push({id:S.nid++,kind:kind||'atk',owner:from.owner,home:kind==='ret'?to.id:from.id,from:from.id,to:to.id,units:us,loot:null,t0:S.t,arr:S.t+travel(from,to,us)});
+}
+function launch(from,to,units){
+ const us=clean(units);if(!sumN(us))return false;
+ for(const u in us)if((from.troops[u]||0)<us[u])return false;
+ for(const u in us){from.troops[u]-=us[u];if(!from.troops[u])delete from.troops[u]}
+ sendMove(from,to,us,'atk');return true}
+
+function transfer(from,to,units,cg){
+ const us=clean(units);
+ for(const u in us)if((from.troops[u]||0)<us[u])return false;
+ for(const r of RES)if(from.res[r]<cg[r])return false;
+ if(!sumN(us)&&!(cg.w+cg.c+cg.i))return false;
+ for(const u in us){from.troops[u]-=us[u];if(!from.troops[u])delete from.troops[u]}
+ for(const r of RES)from.res[r]-=cg[r];
+ S.moves.push({id:S.nid++,kind:'send',owner:from.owner,home:from.id,from:from.id,to:to.id,units:us,loot:{...cg},t0:S.t,arr:S.t+travel(from,to,us)});
+ return true}
+function capture(T,lord){
+ const old=T.owner;T.owner=lord;T.loyalty=35;T.shield=S.t+120;T.troops={};T.bq=[];T.tq={barracks:[],stable:[],academy:[]};
+ for(const k in T.b){const L=T.b[k],min=['hq','farm','warehouse','timber','clay','iron'].includes(k)?1:0;T.b[k]=k==='academy'?0:Math.max(min,L<=2?L:Math.round(L*.8))}
+ T.aiT=rnd(2,5);T.atkT=rnd(40,80);
+ if(lord===0){S.stats.taken++;toast(`${T.name} is yours. Loyalty restarts at 35 and is protected for 2 minutes.`,'good')}
+ if(old===0){S.stats.lost++;toast(`${T.name} has fallen to ${lordOf(lord).name}.`,'bad')}
+ checkEnd()}
+function checkEnd(){
+ const cnt=l=>S.vs.filter(v=>v.owner===l).length;
+ S.lords.forEach(l=>{l.alive=cnt(l.id)>0});
+ if(!S.over){if(!cnt(0))S.over='lose';else if(S.lords.slice(1).every(l=>!l.alive))S.over='win'}}
+
+function arrive(m){
+ const T=V(m.to),H=V(m.home);
+ if(m.kind==='ret'){
+  if(T.owner===m.owner){
+   for(const u in m.units)T.troops[u]=(T.troops[u]||0)+m.units[u];
+   if(m.loot){for(const r of RES)T.res[r]=Math.min(Math.max(T.res[r],wcap(T)),T.res[r]+m.loot[r]);
+    const tot=m.loot.w+m.loot.c+m.loot.i;if(m.owner===0&&tot>0)toast(`Troops are back at ${T.name} with ${fmt(tot)} loot`,'good')}}
+  return}
+ if(m.kind==='send'){
+  if(T.owner===m.owner){
+   for(const u in m.units)T.troops[u]=(T.troops[u]||0)+m.units[u];
+   if(m.loot)for(const r of RES)T.res[r]=Math.min(Math.max(T.res[r],wcap(T)),T.res[r]+m.loot[r]);
+   if(m.owner===0)toast(`Delivery arrived at ${T.name}`,'good')}
+  else S.moves.push({id:S.nid++,kind:'ret',owner:m.owner,home:H.id,from:T.id,to:H.id,units:m.units,loot:m.loot,t0:S.t,arr:S.t+travel(T,H,m.units)});
+  return}
+ if(T.owner===m.owner){for(const u in m.units)T.troops[u]=(T.troops[u]||0)+m.units[u];return}
+ const us=m.units,sc=us.scout||0,atkLord=m.owner,defLord=T.owner;
+ const A=attPower(us),D=defPower(T);
+ const surv={...us},defLoss={};let win=false;
+ if(A>0){
+  let la,ld;
+  if(A>D){win=true;ld=1;la=Math.pow(D/A,1.5)}else{la=1;ld=Math.pow(A/D,1.5)}
+  for(const u in us)surv[u]=la>=1?0:Math.round(us[u]*(1-la));
+  for(const u in T.troops){const k=Math.round(T.troops[u]*ld);if(k>0)defLoss[u]=k;T.troops[u]-=k;if(T.troops[u]<=0)delete T.troops[u]}
+ }else{const sl=Math.min(.9,(T.troops.scout||0)/(sc*2));surv.scout=Math.round(sc*(1-sl))}
+ const lostA=sub(us,surv);
+ let loot=null;
+ if(win){let carry=0;for(const u in surv)carry+=U[u].carry*surv[u];loot={w:0,c:0,i:0};
+  for(let p=0;p<4;p++){const open=RES.filter(r=>T.res[r]>=1);if(!open.length||carry<1)break;const share=carry/open.length;for(const r of open){const take=Math.min(T.res[r],share);T.res[r]-=take;loot[r]+=take;carry-=take}}
+  for(const r of RES)loot[r]=Math.floor(loot[r]);
+  if(surv.axe>0)T.b.wall=Math.max(0,T.b.wall-(A>2*D?2:1));
+  if(atkLord===0)S.stats.raids++}
+ let loy=null,captured=false,nobSpent=0,shielded=false;
+ if(win&&surv.noble>0&&T.shield>S.t)shielded=true;
+ else if(win&&surv.noble>0){let drop=0;for(let i=0;i<surv.noble;i++)drop+=rnd(18,28);const f=T.loyalty;T.loyalty=Math.max(0,T.loyalty-drop);loy=[Math.round(f),Math.round(T.loyalty)];nobSpent=surv.noble;surv.noble=0;captured=T.loyalty<=0}
+ let intel=null;
+ if(atkLord===0&&(surv.scout||0)>0){intel={t:S.t,troops:{...T.troops},res:{w:Math.round(T.res.w),c:Math.round(T.res.c),i:Math.round(T.res.i)},b:{...T.b},loyalty:Math.round(T.loyalty)};S.intel[T.id]=intel}
+ if(!captured&&sumN(clean(surv))>0){const left=clean(surv);S.moves.push({id:S.nid++,kind:'ret',owner:atkLord,home:H.id,from:T.id,to:H.id,units:left,loot,t0:S.t,arr:S.t+travel(T,H,left)})}
+ if(atkLord===0||defLord===0){
+  S.reports.unshift({id:S.nid++,t:S.t,read:false,atk:atkLord,def:defLord,from:H.name,to:T.name,win,A:Math.round(A),D:Math.round(D),sent:us,lost:lostA,defLoss,loot,loy,captured,intel,nobSpent,shielded,garrison:captured&&sumN(clean(surv))>0,scoutOnly:A===0});
+  S.reports.length=Math.min(S.reports.length,40);
+  if(atkLord===0&&nobSpent)toast(`${nobSpent} nobleman spent at ${T.name}: loyalty ${loy[0]} to ${loy[1]}`,'good');
+  if(defLord===0)toast(`${T.name} was attacked by ${lordOf(atkLord).name}: ${win?'defense broke':'attack repelled'}`,win?'bad':'good');
+  else toast(`${win?'Victory':A===0?'Scouting done':'Defeat'} at ${T.name}. See Reports.`,win?'good':'');
+ }
+ if(captured){
+  const left=clean(surv);capture(T,atkLord);
+  for(const u in left)T.troops[u]=(T.troops[u]||0)+left[u];
+  if(loot)for(const r of RES)T.res[r]=Math.min(Math.max(T.res[r],wcap(T)),T.res[r]+loot[r]);
+  if(atkLord===0&&sumN(left))toast(`${sumN(left)} surviving troops now garrison ${T.name}`,'good')}
+}
+
+/* ---------- rival lords ---------- */
+function aiPlan(v){
+ const L=S.lords[v.owner],t=S.t;
+ const want=k=>{switch(k){
+  case'hq':return Math.min(10,1+Math.floor(t/100));
+  case'timber':case'clay':case'iron':return Math.min(10,2+Math.floor(t/60));
+  case'warehouse':return Math.min(12,1+Math.floor(t/220));
+  case'farm':return Math.min(14,1+Math.floor(t/150));
+  case'barracks':return Math.min(8,1+Math.floor(t/100));
+  case'stable':return t>300?Math.min(5,Math.floor(t/300)):0;
+  case'wall':return Math.min(L.p==='builder'?12:8,Math.floor(t/140));
+  case'academy':return(L.p==='warlord'?t>400:t>700)?1:0}return 0};
+ let wanted=false,pri2=[];
+ {
+  const cp=wcap(v);let pri=[];
+  if(RES.some(r=>v.res[r]>cp*.9))pri.push('warehouse');
+  if(popUsed(v)>fcap(v)*.8)pri.push('farm');
+  pri=pri.concat(Object.keys(B).filter(k=>v.b[k]<want(k)).sort((a,b)=>(v.b[a]+.5)/want(a)-(a==='academy'?1:0)-((v.b[b]+.5)/want(b)-(b==='academy'?1:0))+rnd(-.08,.08)));
+  pri2=pri;wanted=pri.some(k=>!canBuild(v,k));
+  if(v.bq.length<1){for(const k of pri){if(canBuild(v,k))continue;if(!enqueueBuild(v,k,1))wanted=false;break}}else wanted=false;
+ }
+ if(wanted&&Math.random()<.5)return;
+ if(v.b.barracks>0){
+  const room=fcap(v)-popUsed(v);
+  let rsv=[0,0,0];
+  if(v.b.academy>0&&(v.troops.noble||0)+v.tq.academy.reduce((s,q)=>s+q.n,0)<3&&v.tq.academy.length<1){if(enqueueTrain(v,'noble',1))rsv=[...U.noble.c]}
+  else if(!v.bq.length)for(const k of pri2){if(!canBuild(v,k)){rsv=cost(k,v.b[k]+v.bq.filter(q=>q.k===k).length+1);break}}
+  const kinds=L.p==='builder'?['spear','sword','axe','axe','cav']:L.p==='raider'?['axe','axe','axe','axe','cav','spear']:['axe','axe','axe','spear','sword','cav'];
+  const u=pick(kinds),bk=U[u].b;
+  if(v.b[bk]>0&&v.tq[bk].length<2){
+   let n=Math.min(ri(4,10)+Math.floor(t/150),Math.floor(room/U[u].pop));
+   for(let j=0;j<3;j++)n=Math.min(n,Math.floor((v.res[RES[j]]-rsv[j])/U[u].c[j]));
+   if(n>0)enqueueTrain(v,u,n)}
+ }
+}
+function aiAttack(v){
+ const L=S.lords[v.owner],d=DIFF[S.diff];
+ if(S.t<90||v.b.barracks<2&&S.t<d.grace)return;
+ const off={};for(const u of['axe','cav'])if(v.troops[u])off[u]=v.troops[u];
+ const power=attPower(off);if(power<60)return;
+ v.know=v.know||{};
+ const maxD=Math.min(34,12+S.t/60),cands=[];
+ for(const T of S.vs){
+  if(T.owner===v.owner)continue;
+  const dd=dist(v,T);if(dd>maxD)continue;
+  if(T.owner===0&&(S.t<d.grace||S.t-(L.lastHit||-1e9)<260/d.rate))continue;
+  if(T.shield>S.t+30)continue;
+  if(S.moves.some(m=>m.kind==='atk'&&m.owner===v.owner&&m.to===T.id))continue;
+  // the lord only knows what it learned earlier; the picture is stale and imprecise
+  let k=v.know[T.id];
+  if(!k||S.t-k.t>k.ttl)k=v.know[T.id]={t:S.t,D:defPower(T)*rnd(.8,1.3),ttl:rnd(180,360)};
+  const Dp=k.D*1.15+10;
+  if(power<Dp*(v.troops.noble?2.5:T.owner===-1?1.15:1.4))continue;
+  const w=(T.owner===-1?3:T.owner===0?(L.p==='raider'?.7:.4):.3)/(dd+3);
+  cands.push({T,D:Dp,w})}
+ if(!cands.length)return;
+ let r=Math.random()*cands.reduce((s,c)=>s+c.w,0),best=cands[0];
+ for(const c of cands){r-=c.w;if(r<=0){best=c;break}}
+ const army={...off};
+ if(v.troops.noble)army.noble=Math.min(v.troops.noble,4);
+ if(launch(v,best.T,army)&&best.T.owner===0)L.lastHit=S.t;
+}
+
+function step(dt){
+ S.t+=dt;
+ const d=DIFF[S.diff];
+ for(const v of S.vs){
+  simVillage(v,dt);
+  if(v.owner>0){
+   v.aiT-=dt;if(v.aiT<=0){v.aiT=rnd(2.5,5);aiPlan(v)}
+   v.atkT-=dt;if(v.atkT<=0){v.atkT=rnd(30,60)/d.rate;aiAttack(v)}}}
+ const due=S.moves.filter(m=>m.arr<=S.t);
+ if(due.length){S.moves=S.moves.filter(m=>m.arr>S.t);due.sort((a,b)=>a.arr-b.arr).forEach(arrive)}
+ for(const m of S.moves)if(!m.seen&&m.kind==='atk'&&m.owner!==0&&V(m.to).owner===0){m.seen=1;toast(`Incoming attack on ${V(m.to).name} from ${V(m.from).name} (${lordOf(m.owner).name})`,'bad')}
+}
+function save(){try{localStorage.setItem(SAVE,JSON.stringify({S,cur}))}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem(SAVE)||'null');if(d&&d.S&&d.S.v===1){S=d.S;cur=d.cur||0;return true}}catch(e){}return false}
+
+/* ---------- icons and village scene ---------- */
+const IC={
+ spear:'<path d="M4 20L16 8"/><polygon points="14,6 18,10 21,3" fill="currentColor"/>',
+ sword:'<path d="M20 4L9 15M7 11l6 6M7 17l-3 3"/>',
+ axe:'<path d="M6 20L16 6"/><path d="M12 8c1-4 5-5 8-4-1 3-3 6-7 7z" fill="currentColor"/>',
+ scout:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3" fill="currentColor"/>',
+ cav:'<path d="M6 20V11a6 6 0 0112 0v9"/><path d="M6 20h3M15 20h3"/><circle cx="9" cy="13" r=".9" fill="currentColor"/><circle cx="15" cy="13" r=".9" fill="currentColor"/>',
+ noble:'<path d="M3 8l5 4 4-7 4 7 5-4-2 10H5z"/>',
+ hq:'<path d="M6 21V8h12v13M4 21h16M9 8V5h6v3M12 5V2l4 1.5L12 5"/>',
+ timber:'<path d="M12 3l6 9h-3l4 6H5l4-6H6z"/><path d="M12 18v3"/>',
+ clay:'<rect x="3" y="6" width="18" height="12"/><path d="M3 12h18M9 6v6M15 12v6"/>',
+ iron:'<path d="M5 20L15 10"/><path d="M8 5c5-2 11 2 11 8-1-4-5-6-9-5z" fill="currentColor"/>',
+ warehouse:'<path d="M3 10l9-6 9 6v10H3z"/><path d="M8 20v-6h8v6M8 17h8"/>',
+ farm:'<path d="M12 21V8"/><path d="M12 8c-3 0-3-4 0-5 3 1 3 5 0 5zM12 14c-4 0-5-3-4-5 3 0 5 2 4 5zM12 14c4 0 5-3 4-5-3 0-5 2-4 5z"/>',
+ barracks:'<path d="M3 20L12 4l9 16z"/><path d="M12 20v-6"/>',
+ stable:'<path d="M3 20V9l9-5 9 5v11M8 20v-7h8v7M8 13l8 7M16 13l-8 7"/>',
+ wall:'<path d="M3 20V6h3v3h3V6h3v3h3V6h3v3h3v11zM3 20h18"/>',
+ academy:'<path d="M12 6c-2-2-6-2-9-1v14c3-1 7-1 9 1 2-2 6-2 9-1V5c-3-1-7-1-9 1zM12 6v14"/>'
+};
+const ico=(k,cls)=>`<svg class="ic ic-${k} ${cls||''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
+
+function renderScene(){
+ const v=curV();if(!v)return;
+ const g=Object.entries(v.troops).filter(([,n])=>n>0).map(([u,n])=>`<span class="uc" title="${U[u].n}">${ico(u)}${n}</span>`).join('')||'<span class="tag">No troops at home</span>';
+ const away=S.moves.filter(m=>m.home===v.id).reduce((s,m)=>s+sumN(m.units),0);
+ setH($('#scene'),sceneSVG(v)+`<div class="garr"><span class="tag">At home</span>${g}${away?`<span class="tag">${away} away</span>`:''}</div>`)}
+
+/* ---------- detailed village scene ---------- */
+const SCENE_DEFS=`<defs>
+<linearGradient id="gGrass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#25402d"/><stop offset="1" stop-color="#152618"/></linearGradient>
+<radialGradient id="gLight" cx=".28" cy=".1" r="1"><stop offset="0" stop-color="#fff0c0" stop-opacity=".16"/><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".42"/></radialGradient>
+<radialGradient id="gGlow"><stop offset="0" stop-color="#ffd37a" stop-opacity=".85"/><stop offset="1" stop-color="#ffd37a" stop-opacity="0"/></radialGradient>
+<linearGradient id="gDome" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a6320"/><stop offset=".4" stop-color="#f0cd6a"/><stop offset="1" stop-color="#a47a28"/></linearGradient>
+<linearGradient id="gHill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5d7079"/><stop offset="1" stop-color="#2c3a42"/></linearGradient>
+<linearGradient id="gPit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a3a28"/><stop offset="1" stop-color="#241109"/></linearGradient>
+<pattern id="gp" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M3 5v-3M4.5 5l1-2.5M1.5 5l-1-2.5M10 11v-3M11.5 11l1-2.5M8.5 11l-1-2.5" stroke="#34553f" stroke-width=".7" fill="none"/></pattern>
+<pattern id="pStone" width="10" height="6" patternUnits="userSpaceOnUse"><rect width="10" height="6" fill="#74848b"/><path d="M0 .4H10M0 3.4H10M2.5 .4V3.4M7.5 3.4V6.4" stroke="#4b5a60" stroke-width=".7" fill="none"/><path d="M0 1.2H10M0 4.2H10" stroke="#93a3a9" stroke-width=".4" opacity=".6"/></pattern>
+<pattern id="pPlaster" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#a99774"/><circle cx="1.5" cy="2" r=".5" fill="#8f7e5d"/><circle cx="4.5" cy="4.5" r=".5" fill="#bba985"/></pattern>
+<pattern id="pPlank" width="5" height="10" patternUnits="userSpaceOnUse"><rect width="5" height="10" fill="#6d4b39"/><path d="M0 0V10" stroke="#47301f" stroke-width=".8"/><path d="M2.5 2V6" stroke="#80594a" stroke-width=".4"/></pattern>
+<pattern id="pPlankL" width="5" height="10" patternUnits="userSpaceOnUse"><rect width="5" height="10" fill="#7d6648"/><path d="M0 0V10" stroke="#54442c" stroke-width=".8"/></pattern>
+<pattern id="pBrass" width="9" height="6" patternUnits="userSpaceOnUse"><rect width="9" height="6" fill="#b8892f"/><path d="M0 5.6q2.2 1 4.5 0t4.5 0" stroke="#7a5518" stroke-width=".9" fill="none"/><path d="M4.5 0V2.8M0 3q2.2 1 4.5 0t4.5 0" stroke="#d6aa4c" stroke-width=".5" fill="none" opacity=".7"/></pattern>
+<pattern id="pRed" width="9" height="6" patternUnits="userSpaceOnUse"><rect width="9" height="6" fill="#933a2e"/><path d="M0 5.6q2.2 1 4.5 0t4.5 0" stroke="#561a14" stroke-width=".9" fill="none"/><path d="M0 3q2.2 1 4.5 0t4.5 0" stroke="#b8574a" stroke-width=".5" fill="none" opacity=".7"/></pattern>
+<pattern id="pDark" width="9" height="6" patternUnits="userSpaceOnUse"><rect width="9" height="6" fill="#4e4234"/><path d="M0 5.6q2.2 1 4.5 0t4.5 0" stroke="#2c2319" stroke-width=".9" fill="none"/></pattern>
+<filter id="fNoise" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 .04 0 0 0 0 .09 0 0 0 0 .05 0 0 0 .22 0"/></filter>
+</defs>`;
+const sh=(rx,ry,x=0,y=0,o=.3)=>`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#000" opacity="${o}"/>`;
+const win=(x,y,w,h)=>`<circle cx="${x+w/2}" cy="${y+h/2}" r="${Math.max(w,h)*1.1}" fill="url(#gGlow)" opacity=".5"/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f4cd75" stroke="#33281a" stroke-width=".9"/><path d="M${x+w/2} ${y}V${y+h}M${x} ${y+h/2}H${x+w}" stroke="#33281a" stroke-width=".7"/>`;
+const arch=(x,y,w,h,f='#24170d')=>`<path d="M${x} ${y+h}V${y+w/2}a${w/2} ${w/2} 0 0 1 ${w} 0V${y+h}z" fill="${f}" stroke="#4d3a24" stroke-width=".9"/>`;
+const flag=(x,y,c)=>`<path d="M${x} ${y}V${y-18}" stroke="#d9d0bc" stroke-width="1"/><path class="flagw" d="M${x} ${y-18}q6 -3 11 0t11 0v8q-5 3 -11 0t-11 0z" fill="${c}" stroke="rgba(0,0,0,.35)" stroke-width=".5"/>`;
+const figure=(x,y,c,t)=>`<g transform="translate(${x} ${y})"><ellipse cy="3" rx="3" ry="1" fill="#000" opacity=".35"/><path d="M0 3V-2" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><circle cy="-4.5" r="1.9" fill="#d8b896"/>${t==='spear'?'<path d="M3 3V-9" stroke="#cfc6b0" stroke-width=".7"/><path d="M3 -9l-1 2h2z" fill="#cfc6b0"/>':t==='axe'?'<path d="M3 3L4 -6" stroke="#6d4b39" stroke-width=".8"/><path d="M4 -6l3 1-1 3z" fill="#aab4b8"/>':'<path d="M3 1V-6" stroke="#cfd6d9" stroke-width=".8"/>'}</g>`;
+const cl=(n,a,z)=>Math.max(a,Math.min(z,n));
+
+function sceneSVG(v){
+ const b=v.b,Q={};v.bq.forEach(q=>Q[q.k]=q.L);
+ const lab=(x,y,k)=>{const nm=B[k].n,ex=Q[k]?` to ${Q[k]}`:'',w=(nm.length+String(b[k]).length+ex.length+1)*5.4+12;
+  return`<g><rect x="${x-w/2}" y="${y-10}" width="${w}" height="14" rx="3" fill="rgba(9,13,15,.74)" stroke="rgba(255,255,255,.1)" stroke-width=".6"/><text x="${x}" y="${y}" text-anchor="middle" class="sl">${nm} <tspan class="sn">${b[k]}</tspan>${Q[k]?`<tspan class="sq">${ex}</tspan>`:''}</text></g>`};
+ const plot=(x,y,w,h)=>`<rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="2" class="splot"/>`;
+ let s=`<svg class="scene" viewBox="0 0 640 300" role="img" aria-label="Your village" shape-rendering="geometricPrecision">${SCENE_DEFS}`;
+ s+=`<rect width="640" height="300" fill="url(#gGrass)"/><rect width="640" height="300" fill="url(#gp)"/><rect width="640" height="300" filter="url(#fNoise)"/>`;
+ // roads
+ s+='<g fill="none" stroke-linecap="butt"><path d="M320 300V165M135 165H505M505 165H640M0 165H135" stroke="#2c261a" stroke-width="20"/><path d="M320 300V165M135 165H505" stroke="#4a3f2c" stroke-width="15"/><path d="M505 165H640M0 165H135" stroke="#3d3424" stroke-width="9"/><path d="M320 300V165M135 165H505" stroke="#5a4d36" stroke-width="1" stroke-dasharray="3 9" opacity=".7"/></g>';
+ // wall
+ const wl=b.wall,sw=6+wl*.9;
+ if(wl>0){
+  const R=`x="135" y="30" width="370" height="255" fill="none"`;
+  s+=`<rect ${R} stroke="#1d2529" stroke-width="${sw+4}" opacity=".6"/><rect ${R} stroke="url(#pStone)" stroke-width="${sw}"/><rect ${R} stroke="#a4b4ba" stroke-width="2" stroke-dasharray="8 5" transform="translate(0 0)" opacity=".75"/>`;
+  if(wl>=2){const t=10+wl*.7;for(const[x,y]of[[135,30],[505,30],[135,285],[505,285]]){
+   s+=`${sh(t+4,t*.5,x+2,y+t,.35)}<circle cx="${x}" cy="${y}" r="${t}" fill="url(#pStone)" stroke="#3e4b51" stroke-width="1.2"/><circle cx="${x}" cy="${y}" r="${t*.55}" fill="#5a6a71" stroke="#3e4b51" stroke-width=".8"/>`;
+   if(wl>=4)s+=`<polygon points="${x-t-1},${y} ${x},${y-t*2.1} ${x+t+1},${y}" fill="url(#pRed)" stroke="#4c1812" stroke-width=".8"/>`;
+   if(wl>=7)s+=flag(x,y-t*2.1,'#e0634b')}}
+  // gate
+  s+=`<rect x="300" y="${285-sw/2-3}" width="40" height="${sw+6}" fill="#2c261a"/>${arch(306,285-sw-4,28,sw+14,'url(#pPlank)')}<path d="M306 ${285-sw+4}H334M306 ${285-sw+10}H334" stroke="#2a2a2a" stroke-width="1.4"/><circle cx="320" cy="${285-sw+8}" r="1.4" fill="#c9b27a"/>`;
+  for(const x of[298,342])s+=`<circle cx="${x}" cy="${285-sw-4}" r="11" fill="url(#gGlow)" opacity=".55"/><path d="M${x} ${285-sw-1}v-5" stroke="#3a2c1c" stroke-width="1.6"/><path class="flick" d="M${x} ${285-sw-6}q-2 -3 0 -6q2 3 0 6z" fill="#ffb340"/>`;
+ }else s+='<rect x="135" y="30" width="370" height="255" fill="none" stroke="#4d5f4c" stroke-width="2.2" stroke-dasharray="2 6" stroke-linecap="round"/>';
+ s+=lab(320,21,'wall');
+ // parade ground troops
+ {const home=v.troops,spears=(home.spear||0)+(home.sword||0),axes=(home.axe||0)+(home.cav||0),n1=cl(Math.ceil(spears/10),0,6),n2=cl(Math.ceil(axes/10),0,6);
+  for(let i=0;i<n1;i++)s+=figure(225+i*9,190+(i%2)*4,'#6f98ad','spear');
+  for(let i=0;i<n2;i++)s+=figure(375+i*9,190+(i%2)*4,'#c8664a','axe')}
+ // headquarters
+ {const sc=cl(.85+.035*b.hq,.85,1.3),smokeAt=-58;
+  s+=`<g transform="translate(320 160) scale(${sc})">${sh(78,10,6,24,.38)}
+  <rect x="-45" y="-30" width="90" height="50" fill="url(#pPlaster)"/><rect x="-45" y="8" width="90" height="12" fill="url(#pStone)"/>
+  <path d="M-45 -30V8M-15 -30V8M15 -30V8M45 -30V8M-45 -10H45" stroke="#3a2a1a" stroke-width="2.4"/><path d="M-45 -30L-15 -10M45 -30L15 -10" stroke="#3a2a1a" stroke-width="1.6"/>
+  <rect x="24" y="-58" width="10" height="26" fill="url(#pStone)" stroke="#3e4b51" stroke-width=".8"/><rect x="22.5" y="-60" width="13" height="3" fill="#5a6a71"/>
+  <circle class="smk s1" cx="29" cy="${smokeAt-4}" r="3.2" fill="#c9cfd1"/><circle class="smk s2" cx="29" cy="${smokeAt-4}" r="4" fill="#c9cfd1"/><circle class="smk s3" cx="29" cy="${smokeAt-4}" r="4.6" fill="#c9cfd1"/>
+  <polygon points="-55,-29 0,-66 55,-29" fill="url(#pBrass)" stroke="#6b4a14" stroke-width="1.1"/><path d="M-55 -29L0 -66L55 -29" fill="none" stroke="#e2bb62" stroke-width=".8" opacity=".6"/><path d="M-50 -27H50" stroke="#000" stroke-width="2" opacity=".25"/>
+  ${win(-37,-22,11,13)}${win(26,-22,11,13)}${win(-5,-24,10,9)}
+  ${arch(-8,2,16,18)}<circle cx="5" cy="13" r="1" fill="#c9b27a"/><rect x="-13" y="20" width="26" height="3" fill="#6b7a80"/>
+  <rect x="50" y="-48" width="20" height="68" fill="url(#pStone)" stroke="#3e4b51" stroke-width="1"/><rect x="48" y="-50" width="24" height="4" fill="#5a6a71" stroke="#3e4b51" stroke-width=".8"/><polygon points="46,-50 60,-80 74,-50" fill="url(#pBrass)" stroke="#6b4a14" stroke-width="1"/>
+  <rect x="58" y="-36" width="4" height="12" fill="#12171a"/>${win(56,-14,8,10)}${flag(60,-80,'#d9aa4a')}</g>`;
+  s+=lab(320,160+24*sc+13,'hq')}
+ // barracks
+ if(b.barracks>0){const sc=cl(.8+.03*b.barracks,.8,1.2);
+  s+=`<g transform="translate(185 112) scale(${sc})">${sh(52,8,4,22,.38)}
+  <rect x="-35" y="-18" width="70" height="38" fill="url(#pPlank)" stroke="#2f1f14" stroke-width="1"/><rect x="-35" y="14" width="70" height="6" fill="url(#pStone)"/>
+  <polygon points="-41,-17 0,-44 41,-17" fill="url(#pRed)" stroke="#4c1812" stroke-width="1.1"/><path d="M-41 -17L0 -44L41 -17" fill="none" stroke="#c9645a" stroke-width=".7" opacity=".6"/>
+  <path d="M-8 -29h16v10a8 9 0 0 1 -16 0z" fill="#d9aa4a" stroke="#6b4a14" stroke-width=".8" transform="translate(0 4) scale(.8)"/><path d="M0 -26V-14M-5 -20H5" stroke="#6b4a14" stroke-width="1.2" transform="translate(0 4)"/>
+  ${arch(-7,0,14,20)}${win(-29,-8,9,10)}${win(20,-8,9,10)}
+  <g transform="translate(46 4)"><path d="M0 14V-6M16 14V-6M-2 -4H18M-2 6H18" stroke="#5b3f2c" stroke-width="1.6"/><path d="M4 12V-14M9 12V-12M13 12V-14" stroke="#cfc6b0" stroke-width=".9"/><path d="M4 -14l-1.5 3h3zM13 -14l-1.5 3h3z" fill="#cfc6b0"/></g>
+  <g transform="translate(-48 8)"><path d="M0 12V-10" stroke="#5b3f2c" stroke-width="2"/><path d="M-8 -4H8" stroke="#5b3f2c" stroke-width="2"/><circle cy="-13" r="4" fill="#b99a5c" stroke="#6d4b39" stroke-width=".8"/></g>
+  ${flag(0,-44,'#e0634b')}</g>`}
+ else s+=plot(185,112,70,40);
+ s+=lab(185,153,'barracks');
+ // stable
+ if(b.stable>0){const sc=cl(.85+.04*b.stable,.85,1.2);
+  s+=`<g transform="translate(190 218) scale(${sc})">${sh(54,7,4,20,.38)}
+  <rect x="-40" y="-14" width="80" height="32" fill="url(#pPlankL)" stroke="#33281a" stroke-width="1"/><polygon points="-46,-13 0,-36 46,-13" fill="url(#pDark)" stroke="#241c12" stroke-width="1"/>
+  <rect x="-14" y="-2" width="28" height="20" fill="#2a1d12" stroke="#4d3a24"/><path d="M-14 -2L0 18L14 -2M0 -2V18M-14 18L0 -2L14 18" stroke="#6e5d41" stroke-width="1"/>
+  <rect x="-8" y="-26" width="16" height="10" fill="#d9c27a" stroke="#6e5d41" stroke-width=".8"/><path d="M-8 -21H8" stroke="#a88c3e" stroke-width=".6"/>
+  <g transform="translate(56 12)"><ellipse cx="0" cy="-2" rx="8" ry="4.6" fill="#7a5436"/><path d="M5 -3L10 -11L14 -9L12 -3z" fill="#7a5436"/><ellipse cx="13" cy="-10" rx="3.6" ry="2.2" fill="#6a4630"/><path d="M-6 -3q-5 2 -4 7" stroke="#2b1c10" stroke-width="1.4" fill="none"/><path d="M-4 1V6M-1 1V6M3 1V6M6 1V6" stroke="#5a3d27" stroke-width="1.3"/></g>
+  <g transform="translate(-30 24)"><ellipse rx="7" ry="5" fill="#c9ad52" stroke="#8a7330" stroke-width=".8"/><path d="M-6 -1H6M-5 2H5" stroke="#8a7330" stroke-width=".6"/></g></g>`}
+ else s+=plot(190,218,80,34);
+ s+=lab(190,254,'stable');
+ // academy
+ if(b.academy>0)s+=`<g transform="translate(445 108)">${sh(26,6,2,22,.38)}<rect x="-17" y="-38" width="34" height="58" fill="url(#pStone)" stroke="#3b4a63" stroke-width="1"/><rect x="-17" y="-38" width="34" height="58" fill="#3d4a63" opacity=".45"/><path d="M-17 -18H17M-17 2H17" stroke="#d9aa4a" stroke-width="1.4"/>
+  <path d="M-23 -38A23 23 0 0 1 23 -38z" fill="url(#gDome)" stroke="#6b4a14" stroke-width="1"/><path d="M0 -61V-38M-12 -56L-8 -38M12 -56L8 -38" stroke="#7a5518" stroke-width=".8" opacity=".7"/><path d="M0 -61V-70" stroke="#d9d0bc"/><path d="M0 -75l1.6 3.6 3.8.4-2.9 2.6.9 3.8L0 -67l-3.4 2.4.9-3.8-2.9-2.6 3.8-.4z" fill="#f0cd6a"/>
+  ${arch(-5,-32,10,14,'#f4cd75')}${arch(-5,-12,10,14,'#f4cd75')}${arch(-7,4,14,16)}</g>`;
+ else s+=plot(445,100,36,60);
+ s+=lab(445,141,'academy');
+ // warehouse
+ if(b.warehouse>0){const n=cl(1+Math.floor(b.warehouse/2),1,5);
+  s+=`<g transform="translate(445 215)">${sh(50,7,2,20,.38)}<rect x="-35" y="-18" width="70" height="34" fill="url(#pPlankL)" stroke="#33281a" stroke-width="1"/><polygon points="-40,-17 -30,-32 30,-32 40,-17" fill="url(#pDark)" stroke="#241c12" stroke-width="1"/><rect x="-11" y="-4" width="22" height="20" fill="#2a1d12" stroke="#4d3a24"/><path d="M0 -4V16" stroke="#4d3a24"/><circle cx="-28" cy="-8" r="8" fill="url(#gGlow)" opacity=".5"/><rect x="-30" y="-12" width="4" height="7" fill="#f4cd75"/>
+  ${Array.from({length:n},(_,i)=>`<g transform="translate(${-34+i*14} 22)"><rect width="11" height="10" fill="#9a7440" stroke="#5a4426" stroke-width=".8"/><path d="M0 0L11 10M11 0L0 10" stroke="#5a4426" stroke-width=".6"/></g>`).join('')}
+  <g transform="translate(42 12)"><ellipse rx="5" ry="7" fill="#7d5a34" stroke="#4a331c" stroke-width=".8"/><path d="M-5 -2H5M-5 3H5" stroke="#3a2a1a" stroke-width=".9"/></g></g>`}
+ else s+=plot(445,215,70,36);
+ s+=lab(445,257,'warehouse');
+ // timber camp
+ {const slots=[[30,50],[75,40],[110,70],[45,95],[90,105],[20,125],[115,125],[60,72],[100,38]],n=cl(1+b.timber,1,9);
+  s+=`<rect x="0" y="20" width="132" height="120" fill="#142414" opacity=".25" rx="10"/>`;
+  for(let i=0;i<n;i++){const[x,y]=slots[i],z=1+b.timber*.018+(i%3)*.06;
+   s+=`<g transform="translate(${x} ${y}) scale(${z})">${sh(9,3,0,10,.35)}<rect x="-2" y="2" width="4" height="9" fill="#5a4426"/><polygon points="0,-12 11,5 -11,5" fill="#2c5836"/><polygon points="0,-12 11,5 0,5" fill="#1f4128"/><polygon points="0,-21 8,-6 -8,-6" fill="#38693f"/><polygon points="0,-21 8,-6 0,-6" fill="#285233"/><polygon points="0,-28 5,-16 -5,-16" fill="#42794a"/></g>`}
+  if(b.timber>=2)s+=`<g transform="translate(22 142)"><rect x="-3" y="-6" width="6" height="7" fill="#6d4b39"/><path d="M0 -6L9 -17" stroke="#6d4b39" stroke-width="1.6"/><path d="M8 -18l5 1-2 4z" fill="#aab4b8"/></g>`;
+  if(b.timber>=3)for(let i=0;i<4;i++)s+=`<circle cx="${96+(i%2)*8+(i>1?4:0)}" cy="${140-(i>1?7:0)}" r="4.2" fill="#9a7440" stroke="#5a4426" stroke-width=".8"/><circle cx="${96+(i%2)*8+(i>1?4:0)}" cy="${140-(i>1?7:0)}" r="1.6" fill="#b8925a"/>`;
+  s+=lab(65,155,'timber')}
+ // clay pit
+ {const n=cl(1+b.clay,1,8);
+  s+=`<ellipse cx="62" cy="212" rx="46" ry="20" fill="#4a2c1c" stroke="#7a4a32" stroke-width="1"/><ellipse cx="62" cy="214" rx="36" ry="14" fill="url(#gPit)"/><ellipse cx="62" cy="216" rx="24" ry="8" fill="#1e0e08"/><path d="M30 208q32 -14 64 0" stroke="#8a5a40" stroke-width=".8" fill="none" opacity=".7"/>`;
+  s+=`<g transform="translate(112 228)"><rect x="-9" y="-6" width="18" height="9" fill="#6d4b39" stroke="#3a2618" stroke-width=".8"/><circle cx="-5" cy="5" r="3.2" fill="#2a1f16" stroke="#8a7a60" stroke-width=".7"/><circle cx="5" cy="5" r="3.2" fill="#2a1f16" stroke="#8a7a60" stroke-width=".7"/><ellipse cx="0" cy="-6" rx="8" ry="2.4" fill="#a8563a"/></g>`;
+  for(let i=0;i<n;i++){const x=16+(i%4)*13+(i>3?6:0),y=i>3?250:260;s+=`<rect x="${x}" y="${y}" width="12" height="7" fill="#b5603f" stroke="#6e3420" stroke-width=".8"/><path d="M${x+6} ${y}V${y+7}M${x} ${y+3.5}H${x+12}" stroke="#7a3d26" stroke-width=".5"/>`}
+  s+=lab(62,284,'clay')}
+ // iron mine
+ {const n=cl(b.iron,1,6),sp=[[556,96],[598,100],[576,76],[614,112],[546,112],[592,80]];
+  s+=`${sh(60,8,582,134,.4)}<polygon points="528,134 558,74 580,90 604,58 634,134" fill="url(#gHill)" stroke="#5f737c" stroke-width="1"/><path d="M558 74L566 134M604 58L596 134M580 90L584 134" stroke="#2a363d" stroke-width="1.2" opacity=".6"/><path d="M604 58L612 76L600 72zM558 74L564 86L552 84z" fill="#d7e3e8" opacity=".8"/>
+  <path d="M563 134V114a12 12 0 0 1 24 0V134z" fill="#0b0f11" stroke="#4d3a24" stroke-width="2.4"/><path d="M559 134V112a16 16 0 0 1 32 0V134" fill="none" stroke="#6d4b39" stroke-width="2"/><path d="M570 134L566 150M580 134L584 150M568 142H582M567 148H583" stroke="#7d8a8f" stroke-width="1"/>
+  <g transform="translate(604 140)"><path d="M-10 -8H10L7 4H-7z" fill="#5a4a3a" stroke="#2c2018" stroke-width=".8"/><circle cx="-5" cy="6" r="2.6" fill="#222" stroke="#8a8a8a" stroke-width=".6"/><circle cx="5" cy="6" r="2.6" fill="#222" stroke="#8a8a8a" stroke-width=".6"/><path d="M-6 -8l3 -3 4 2 3 -3 3 4z" fill="#8fb5cb"/></g>`;
+  for(let i=0;i<n;i++){const[x,y]=sp[i];s+=`<polygon points="${x},${y-6} ${x+4},${y} ${x},${y+6} ${x-4},${y}" fill="#8fb5cb" stroke="#d3ecf8" stroke-width=".6"/>`}
+  s+=lab(580,164,'iron')}
+ // farm
+ {const n=cl(1+b.farm,1,7);
+  for(let i=0;i<n;i++){const y=190+i*13;s+=`<rect x="526" y="${y}" width="104" height="11" fill="#5a4a22" stroke="#7d6a2d" stroke-width=".8"/><path d="M528 ${y+5.5}H628" stroke="#3e3216" stroke-width="1.4"/>`;
+   let t='';for(let x=530;x<626;x+=6)t+=`M${x} ${y+9}V${y+2}`;s+=`<path d="${t}" stroke="#d3b95a" stroke-width="1.2" stroke-linecap="round"/>`}
+  s+=`<g transform="translate(560 182)"><path d="M0 12V-6M-7 0H7" stroke="#6d4b39" stroke-width="1.6"/><circle cy="-9" r="3" fill="#cdb98a"/><path d="M-4 -12h8l-4 -5z" fill="#4e4234"/></g>`;
+  if(b.farm>=4)s+=`<g transform="translate(618 180)"><rect x="-6" y="-14" width="12" height="20" fill="url(#pStone)" stroke="#3e4b51" stroke-width=".8"/><path d="M-7 -14A7 5 0 0 1 7 -14z" fill="#7d8a8f"/></g>`;
+  s+=lab(578,Math.min(296,190+n*13+14),'farm')}
+ s+='<rect width="640" height="300" fill="url(#gLight)" pointer-events="none"/>';
+ return s+'</svg>'}
+
+const curV=()=>{let v=S.vs[cur];if(!v||v.owner!==0){v=S.vs.find(x=>x.owner===0);if(v)cur=v.id}return v};
+const chips=(c,v)=>c.map((x,j)=>`<span class="${RES[j]}${v&&v.res[RES[j]]<x?' no':''}">${fmt(x)}</span>`).join('');
+const PL={spear:'spearmen',sword:'swordsmen',axe:'axemen',scout:'scouts',cav:'light cavalry',noble:'noblemen'};
+const unitList=us=>Object.entries(us).filter(([,n])=>n>0).map(([u,n])=>`<span class="uc" title="${U[u].n}">${ico(u)}${n} ${n>1?PL[u]:U[u].n.toLowerCase()}</span>`).join(' ')||'none';
+const ownTag=o=>{const l=lordOf(o);return`<span class="own" style="background:${l.color}">${o===0?'You':l.name}</span>`};
+
+function renderTop(){
+ const v=curV();if(!v)return;
+ $('#vname').textContent=v.name;
+ $('#vsub').textContent=`(${v.x}, ${v.y}) · ${S.vs.filter(x=>x.owner===0).length} village${S.vs.filter(x=>x.owner===0).length>1?'s':''}`;
+ const cp=wcap(v),pu=popUsed(v),pc=fcap(v);
+ const col={w:'var(--wood)',c:'var(--clay)',i:'var(--iron)'},nm={w:'Wood',c:'Clay',i:'Iron'};
+ $('#res').innerHTML=RES.map(r=>`<div class="chip"><div class="l"><span>${nm[r]}</span><span class="mono">+${rate(v,r).toFixed(1)}/s</span></div><div class="v">${fmt(v.res[r])} <small>/ ${fmt(cp)}</small></div><div class="meter"><i style="width:${Math.min(100,v.res[r]/cp*100)}%;background:${col[r]}"></i></div></div>`).join('')+
+ `<div class="chip"><div class="l"><span>Population</span></div><div class="v">${pu} <small>/ ${pc}</small></div><div class="meter"><i style="width:${Math.min(100,pu/pc*100)}%;background:var(--good)"></i></div></div>`;
+ const rivals=S.lords.slice(1).filter(l=>l.alive).length;
+ $('#clock').textContent=`Day ${Math.floor(S.t/60)+1} · ${tm(S.t%60)} · ${rivals} rival lord${rivals===1?'':'s'} left`;
+ document.querySelectorAll('[data-act=speed]').forEach(b=>b.classList.toggle('on',!paused&&+b.dataset.v===speed));
+ $('#bpause').classList.toggle('on',paused);$('#bpause').textContent=paused?'Resume':'Pause';
+ const inc=S.moves.filter(m=>m.kind==='atk'&&m.owner!==0&&V(m.to).owner===0).sort((a,b)=>a.arr-b.arr);
+ const al=$('#alert');
+ if(inc.length){const m=inc[0];al.style.display='block';al.innerHTML=`<b>${inc.length} incoming attack${inc.length>1?'s':''}.</b> Next hits ${V(m.to).name} in <span class="mono">${tm(m.arr-S.t)}</span> from ${V(m.from).name} (${lordOf(m.owner).name}), about ${Math.round(attPower(m.units))} attack power.`}
+ else al.style.display='none';
+}
+
+function renderTabs(){
+ const unread=S.reports.filter(r=>!r.read).length;
+ const incoming=S.moves.filter(m=>m.kind==='atk'&&m.owner!==0&&V(m.to).owner===0).length;
+ const T=[['build','Buildings'],['train','Training'],['orders','Orders'+(incoming?`<i>${incoming}</i>`:'')],['reports','Reports'+(unread?`<i>${unread}</i>`:'')],['villages','Villages']];
+ $('#tabs').innerHTML=T.map(([k,l])=>`<button class="tab${tab===k?' on':''}" data-act="tab" data-v="${k}">${l}</button>`).join('');
+}
+const effect=(v,k)=>{const L=v.b[k];switch(k){
+ case'timber':case'clay':case'iron':return`${prodAt(L).toFixed(1)}/s now, ${prodAt(L+1).toFixed(1)}/s next`;
+ case'warehouse':return`Holds ${fmt(wcap(v))} of each`;
+ case'farm':return`Supports ${fcap(v)} population`;
+ case'hq':return`Build time x${Math.pow(.93,L-1).toFixed(2)}`;
+ case'barracks':return`Spearmen, swordsmen, axemen. Speed x${Math.pow(.93,Math.max(0,L-1)).toFixed(2)}`;
+ case'stable':return'Scouts and light cavalry';
+ case'wall':return`Defense +${L*7}%, plus ${15+5*L} flat`;
+ case'academy':return'Trains noblemen who capture villages'}return''};
+
+function paneBuild(v){
+ let h='';
+ if(v.bq.length)h+='<div class="queue">'+v.bq.map((q,i)=>`<div class="qrow"><span>${B[q.k].n} to level ${q.L}</span><span class="mono">${tm(q.t)}</span><button class="x" data-act="cancelb" data-i="${i}">Cancel</button><div class="bar"><i style="width:${(1-q.t/q.tot)*100}%"></i></div></div>`).join('')+'</div>';
+ for(const k in B){
+  const lv=v.b[k],qn=v.bq.filter(q=>q.k===k).length,L=lv+qn+1,err=canBuild(v,k),c=L<=B[k].max?cost(k,L):null;
+  const ok=!err&&c&&afford(v,c)&&v.bq.length<2;
+  h+=`<div class="row"><div class="nm">${ico(k,"bi")}<b>${B[k].n}</b> <span class="lv">${lv}${qn?` +${qn}`:''}</span><small>${effect(v,k)}</small></div>
+  <div>${c?`<div class="costs">${chips(c,v)}<span class="tag mono">${tm(btime(v,k,L))}</span></div>`:'<span class="tag">Fully built</span>'}${err&&c?`<span class="tag">${err}</span>`:''}</div>
+  <button class="btn sm" data-act="build" data-k="${k}"${ok?'':' disabled'}>${lv===0&&!qn?'Build':'Upgrade'}</button></div>`}
+ return h}
+
+function paneTrain(v){
+ let h='';const room=fcap(v)-popUsed(v);
+ for(const bk of['barracks','stable','academy']){
+  const q=v.tq[bk];
+  h+=`<h3>${B[bk].n} <span class="lv">${v.b[bk]}</span></h3>`;
+  if(v.b[bk]<1){h+=`<div class="empty">Build the ${B[bk].n.toLowerCase()} first.</div>`;continue}
+  for(const u in U){if(U[u].b!==bk)continue;const d=U[u];
+   const away=S.moves.filter(m=>m.home===v.id).reduce((s,m)=>s+(m.units[u]||0),0);
+   let mx=Math.floor(room/d.pop);for(let j=0;j<3;j++)mx=Math.min(mx,Math.floor(v.res[RES[j]]/d.c[j]));mx=Math.max(0,mx);
+   h+=`<div class="row"><div class="nm">${ico(u,"bi")}<b>${d.n}</b> <span class="lv">${v.troops[u]||0}</span>${away?`<small>${away} away</small>`:''}${u==='noble'?'<small>Spent when it lowers a village\'s loyalty</small>':''}<div class="stats"><span>ATK ${d.a}</span><span>DEF ${d.d}</span><span>Carry ${d.carry}</span><span>${d.sp} t/s</span><span>Pop ${d.pop}</span></div></div>
+   <div class="costs">${chips(d.c,v)}<span class="tag mono">${Math.round(utime(v,u))}s each</span></div>
+   <div class="qty"><input type="number" min="0" id="tr_${u}" data-draft="train.${u}" value="${draft.train[u]||''}" placeholder="0" aria-label="${d.n} quantity"><button class="btn ghost sm" data-act="trmax" data-u="${u}" data-n="${mx}">Max</button><button class="btn sm" data-act="train" data-u="${u}">Train</button></div></div>`}
+  if(q.length)h+='<div class="queue">'+q.map(it=>`<div class="qrow"><span>${it.n} x ${U[it.u].n}</span><span class="mono">${tm(it.t)} next</span><span></span></div>`).join('')+'</div>'}
+ return h}
+
+function paneOrders(v){
+ const mine=S.moves.filter(m=>m.owner===0||V(m.to).owner===0).sort((a,b)=>a.arr-b.arr);
+ if(!mine.length)return'<div class="empty">No troops are moving. Pick a village on the map to send an attack, a raid or a scout.</div>';
+ return mine.map(m=>{const inc=m.owner!==0,k=m.kind==='ret'?'Returning':m.kind==='send'?'Sending':inc?'Incoming attack':'Attack';
+  return`<div class="row"><div class="nm"><b style="color:${inc?'var(--bad)':'var(--ink)'}">${k}</b><small>${V(m.from).name} to ${V(m.to).name}${inc?' ('+lordOf(m.owner).name+')':''}</small></div>
+  <div><div class="stats"><span>${inc?Math.round(attPower(m.units))+' attack power':unitList(m.units)}${m.loot&&m.loot.w+m.loot.c+m.loot.i>0?(m.kind==='send'?' · cargo ':' · loot ')+fmt(m.loot.w+m.loot.c+m.loot.i):''}</span></div><div class="bar"><i style="width:${Math.min(100,(S.t-m.t0)/(m.arr-m.t0)*100)}%"></i></div></div>
+  <span class="mono">${tm(m.arr-S.t)}</span></div>`}).join('')}
+
+function repTitle(r){
+ if(r.scoutOnly)return['neu',`Scouted ${r.to}`];
+ if(r.atk===0)return r.captured?['win',`Conquered ${r.to}`]:r.win?['win',`Victory at ${r.to}`]:['loss',`Defeat at ${r.to}`];
+ return r.win?['loss',`${r.to} was hit by ${lordOf(r.atk).name}`]:['win',`Repelled ${lordOf(r.atk).name} at ${r.to}`]}
+function paneReports(){
+ if(!S.reports.length)return'<div class="empty">No battles yet.</div>';
+ return S.reports.map(r=>{const[c,t]=repTitle(r),open=openRep===r.id;
+  let b='';
+  if(open){b=`<div class="body"><div>From <b>${r.from}</b> (${lordOf(r.atk).name}) to <b>${r.to}</b> (${lordOf(r.def).name})</div>
+  ${r.scoutOnly?'':`<div>Attack power <b>${r.A}</b> against defense <b>${r.D}</b></div>`}
+  <div>Sent: ${unitList(r.sent)}</div>${sumN(r.lost)?`<div>Attacker losses: ${unitList(r.lost)}</div>`:''}${sumN(r.defLoss)?`<div>Defender losses: ${unitList(r.defLoss)}</div>`:''}
+  ${r.loot?`<div>Loot: <span class="w">${fmt(r.loot.w)}</span> <span class="c">${fmt(r.loot.c)}</span> <span class="i">${fmt(r.loot.i)}</span></div>`:''}
+  ${r.nobSpent?`<div>Noblemen: <b>${r.nobSpent}</b> spent lowering loyalty${r.lost.noble?`, <b>${r.lost.noble}</b> fell in battle`:''}</div>`:r.lost.noble?`<div>Noblemen: <b>${r.lost.noble}</b> fell in battle</div>`:''}
+  ${r.shielded?'<div>The village was newly taken, so its loyalty is protected. The noblemen turn back.</div>':''}${r.garrison?'<div>The surviving troops now garrison the captured village.</div>':''}
+  ${r.loy?`<div>Loyalty fell from <b>${r.loy[0]}</b> to <b>${r.loy[1]}</b>${r.captured?'. The village changed hands.':''}</div>`:''}
+  ${r.intel?`<div>Scouts saw: ${unitList(r.intel.troops)}. Stores <span class="w">${fmt(r.intel.res.w)}</span> <span class="c">${fmt(r.intel.res.c)}</span> <span class="i">${fmt(r.intel.res.i)}</span>. Wall ${r.intel.b.wall}.</div>`:''}</div>`}
+  return`<div class="rep${r.read?'':' unread'}"><div class="hd" data-act="rep" data-id="${r.id}"><span><b class="${c}">${t}</b></span><span class="tag mono">${tm(S.t-r.t)} ago</span></div>${b}</div>`}).join('')}
+
+function paneVillages(){
+ return S.vs.filter(v=>v.owner===0).map(v=>`<div class="row"><div class="nm"><b>${v.name}</b> <span class="lv">${pts(v)}</span><small>(${v.x}, ${v.y}) · loyalty ${Math.round(v.loyalty)}</small></div>
+ <div class="stats"><span>Wood ${fmt(v.res.w)}</span><span>Clay ${fmt(v.res.c)}</span><span>Iron ${fmt(v.res.i)}</span><span>${unitList(v.troops)}</span></div>
+ <button class="btn sm${v.id===cur?' ghost':''}" data-act="goto" data-id="${v.id}"${v.id===cur?' disabled':''}>${v.id===cur?'Viewing':'Open'}</button></div>`).join('')}
+
+function renderPanel(force){
+ const p=$('#panel');
+ if(!force&&p.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')return;
+ const v=curV();if(!v)return;
+ setH(p,tab==='build'?paneBuild(v):tab==='train'?paneTrain(v):tab==='orders'?paneOrders(v):tab==='reports'?paneReports():paneVillages());
+}
+
+/* ---------- target dossier ---------- */
+function sendTotals(v,T){const us={};for(const u in U){const n=Math.min(v.troops[u]||0,Math.max(0,Math.floor(+draft.send[u]||0)));if(n>0)us[u]=n}return us}
+function updSend(){
+ const v=curV(),T=selId!=null?V(selId):null,el=$('#sendinfo');if(!el||!T)return;
+ const us=sendTotals(v,T),it=S.intel[T.id];
+ if(T.owner===0){const cg=RES.reduce((s,r)=>s+Math.min(Math.floor(v.res[r]),Math.max(0,Math.floor(+draft.send['r'+r]||0))),0);
+  el.textContent=sumN(us)||cg?`Travel ${tm(travel(v,T,us))}${sumN(us)?'':' (carts, slower than troops)'} · ${sumN(us)} troops, ${fmt(cg)} resources`:'Choose troops or resources to send.';return}
+ if(!sumN(us)){el.textContent='Choose troops to send.';return}
+ let s=`Travel ${tm(travel(v,T,us))} · attack power ${Math.round(attPower(us))}`;
+ if(it)s+=` · scouted defense ${Math.round(defPower(T,it.troops))}`;
+ if(us.noble)s+=' · noblemen are spent when they lower loyalty';
+ el.textContent=s}
+function troopInputs(v){
+ let h='';
+ for(const u in U){const n=v.troops[u]||0;if(!n)continue;
+  h+=`<label><span>${ico(u)} ${U[u].n} (${n})</span><span class="in"><input type="number" min="0" max="${n}" id="sd_${u}" data-draft="send.${u}" value="${draft.send[u]||''}" placeholder="0"><button class="btn ghost sm" data-act="sdall" data-u="${u}" data-n="${n}">All</button></span></label>`}
+ if(!h)h='<span class="tag">No troops at home.</span>';
+ return h}
+function resInputs(v){
+ const nm={w:'Wood',c:'Clay',i:'Iron'};
+ return RES.map(r=>{const n=Math.floor(v.res[r]);return`<label><span class="${r}">${nm[r]} (${fmt(n)})</span><span class="in"><input type="number" min="0" max="${n}" id="sr_${r}" data-draft="send.r${r}" value="${draft.send['r'+r]||''}" placeholder="0"><button class="btn ghost sm" data-act="srall" data-r="${r}" data-n="${n}">All</button></span></label>`}).join('')}
+function renderTarget(force){
+ const box=$('#target'),v=curV();
+ if(!force&&box.contains(document.activeElement)&&document.activeElement.tagName==='INPUT'){updSend();return}
+ if(selId==null||!V(selId)){setH(box,'<div class="empty" style="padding:4px 0">Tap a village on the map to see it and send troops. Gold squares are yours, coloured ones belong to rival lords, grey ones are barbarians.</div>');return}
+ const T=V(selId),l=lordOf(T.owner),d=dist(v,T),it=S.intel[T.id];
+ let h=`<h2>${T.name}${ownTag(T.owner)}</h2><div class="kv"><span>Position <b>(${T.x}, ${T.y})</b></span><span>Distance <b>${d.toFixed(1)}</b></span><span>Size <b>${pts(T)}</b></span><span>Loyalty <b>${Math.round(T.loyalty)}</b></span>${T.shield>S.t?`<span>Loyalty protected <b>${tm(T.shield-S.t)}</b></span>`:''}</div>`;
+ if(T.owner===0){
+  h+=`<div class="ctl"><button class="btn" data-act="goto" data-id="${T.id}"${T.id===cur?' disabled':''}>${T.id===cur?'Currently managing':'Manage this village'}</button></div>`;
+  if(T.id!==cur)h+=`<h3>Send from ${v.name}</h3><div class="send">${troopInputs(v)}${resInputs(v)}</div><div class="tag mono" id="sendinfo"></div><div class="ctl" style="margin-top:8px"><button class="btn" data-act="transfer">Send to ${T.name}</button><button class="btn ghost" data-act="clr">Clear</button></div>`;
+  setH(box,h);if(T.id!==cur)updSend();return}
+ h+=it?`<div class="intel">Scouted ${tm(S.t-it.t)} ago. Troops: ${unitList(it.troops)}. Stores <span class="w">${fmt(it.res.w)}</span> <span class="c">${fmt(it.res.c)}</span> <span class="i">${fmt(it.res.i)}</span>. Wall ${it.b.wall}. Defense about <b class="mono">${Math.round(defPower(T,it.troops))}</b>.</div>`:`<div class="intel">Not scouted. Send a scout, or a few troops, to learn its defense.</div>`;
+ h+='<div class="send">'+troopInputs(v)+`</div><div class="tag mono" id="sendinfo"></div><div class="ctl" style="margin-top:8px"><button class="btn" data-act="attack">Send attack</button><button class="btn ghost" data-act="scout1"${v.troops.scout?'':' disabled'}>Scout with 1</button><button class="btn ghost" data-act="alloff">Fill all offense</button><button class="btn ghost" data-act="clr">Clear</button></div>`;
+ setH(box,h);updSend()}
+
+/* ---------- map ---------- */
+const hash=(x,y)=>{let h=x*374761393+y*668265263;h=(h^(h>>>13))*1274126177;return((h^(h>>>16))>>>0)/4294967295};
+function drawMap(){
+ const cv=$('#map'),w=cv.parentElement.clientWidth;if(!w||!S)return;
+ const dpr=window.devicePixelRatio||1;
+ if(cv.width!==Math.round(w*dpr)){cv.width=cv.height=Math.round(w*dpr);cv.style.height=w+'px'}
+ const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);const cs=w/MAP;
+ for(let x=0;x<MAP;x++)for(let y=0;y<MAP;y++){const n=hash(x,y);g.fillStyle=`hsl(${135+n*25},${16+n*10}%,${8+n*5}%)`;g.fillRect(x*cs,y*cs,cs+.5,cs+.5)}
+ g.strokeStyle='rgba(255,255,255,.04)';g.lineWidth=1;g.beginPath();for(let i=0;i<=MAP;i+=1){g.moveTo(i*cs,0);g.lineTo(i*cs,w);g.moveTo(0,i*cs);g.lineTo(w,i*cs)}g.stroke();
+ const P=(v)=>[(v.x+.5)*cs,(v.y+.5)*cs];
+ for(const m of S.moves){const a=P(V(m.from)),b=P(V(m.to));const inc=m.owner!==0&&V(m.to).owner===0;
+  const col=inc?'#ea684f':m.owner===0?'#e3b04b':lordOf(m.owner).color;
+  g.strokeStyle=col;g.globalAlpha=m.kind==='ret'?.25:.55;g.setLineDash([4,4]);g.lineWidth=inc?2:1;g.beginPath();g.moveTo(...a);g.lineTo(...b);g.stroke();g.setLineDash([]);g.globalAlpha=1;
+  const f=Math.min(1,Math.max(0,(S.t-m.t0)/(m.arr-m.t0)));g.fillStyle=col;g.beginPath();g.arc(a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,Math.max(2.5,cs*.17),0,7);g.fill()}
+ for(const v of S.vs){const[px,py]=P(v),l=lordOf(v.owner),r=cs*(.2+Math.min(.14,pts(v)/1400));
+  if(v.owner===-1){g.strokeStyle=BARB;g.lineWidth=1.5;g.strokeRect(px-r,py-r,r*2,r*2);g.fillStyle='rgba(139,145,141,.25)';g.fillRect(px-r,py-r,r*2,r*2)}
+  else{g.fillStyle=l.color;g.fillRect(px-r,py-r,r*2,r*2);g.fillStyle='rgba(10,14,16,.7)';g.fillRect(px-r*.45,py-r*.45,r*.9,r*.9)}
+  if(v.owner===0&&v.id===cur){g.strokeStyle='#e3b04b';g.lineWidth=1.5;g.beginPath();g.arc(px,py,r*1.9,0,7);g.stroke()}
+  if(v.id===selId){g.strokeStyle='#e8e4d6';g.setLineDash([3,3]);g.lineWidth=1.5;g.strokeRect(px-r*1.5,py-r*1.5,r*3,r*3);g.setLineDash([])}
+  if(v.owner===0||v.id===selId){g.fillStyle='#e8e4d6';g.font=`${Math.max(10,cs*.38)}px system-ui,sans-serif`;g.textAlign='center';g.fillText(v.name,px,py-r*2.1)}}
+}
+
+const cache=new WeakMap();
+function setH(el,h){if(cache.get(el)!==h){cache.set(el,h);el.innerHTML=h}}
+let ptr=false;
+document.addEventListener('pointerdown',()=>{ptr=true});
+['pointerup','pointercancel'].forEach(e=>document.addEventListener(e,()=>{setTimeout(()=>{ptr=false},60)}));
+
+function overlay(mode){
+ const o=$('#overlay'),c=$('#card');
+ const has=(()=>{try{return!!localStorage.getItem(SAVE)}catch(e){return false}})();
+ const how=`<ul><li>Upgrade mines and the warehouse first, then the barracks. Everything runs fast: a level takes seconds.</li><li>Raid barbarian villages for loot. Farther ones are stronger. Send a scout before you commit troops.</li><li>Rival lords build up, raid barbarians and each other, and will come for you once the grace period ends (10 minutes on Easy, 7 on Normal, 5 on Hard).</li><li>Build the Academy, train noblemen and send them behind a clearing attack. Each surviving nobleman cuts about 23 loyalty, and loyalty heals slowly (about 2 per minute). At zero the village is yours.</li><li>The army that breaks a village's loyalty stays there as its garrison, and the village is protected for 2 minutes.</li><li>Select one of your other villages on the map to send it troops and resources.</li><li>Win by taking every village from all four rival lords.</li></ul>`;
+ if(mode==='over'){
+  const win=S.over==='win';
+  c.innerHTML=`<h1>${win?'The march is yours':'Your banner has fallen'}</h1><p>${win?'Every rival lord has lost their holdings.':'You lost your last village.'} Time ${tm(S.t)}, villages taken ${S.stats.taken}, raids won ${S.stats.raids}, villages lost ${S.stats.lost}.</p><div class="ctl">${[0,1,2].map(i=>`<button class="btn${i===1?'':' ghost'}" data-act="new" data-v="${i}">New campaign: ${DIFF[i].n}</button>`).join('')}</div>`;
+ }else{
+  c.innerHTML=`<h1>Marchlands</h1><p>A solo war of villages. Grow your holdings, raid the barbarians and take the rival lords' villages with noblemen.</p>${how}
+  <div class="ctl">${[0,1,2].map(i=>`<button class="btn${i===1?'':' ghost'}" data-act="new" data-v="${i}">New campaign: ${DIFF[i].n}</button>`).join('')}</div>
+  ${has||running?`<div class="ctl"><button class="btn ghost" data-act="resume">${running?'Back to game':'Continue saved game'}</button></div>`:''}`;
+ }
+ o.classList.add('on');paused=true;
+}
+function startGame(d){newGame(d);begin()}
+function begin(){running=true;paused=false;$('#overlay').classList.remove('on');renderAll(true)}
+function renderAll(force){renderScene();renderTop();renderTabs();renderPanel(force);renderTarget(force);drawMap()}
+
+document.addEventListener('input',e=>{
+ const k=e.target.dataset&&e.target.dataset.draft;if(!k)return;
+ const[g,u]=k.split('.');draft[g][u]=e.target.value;if(g==='send')updSend()});
+
+document.addEventListener('click',e=>{
+ const el=e.target.closest('[data-act]');if(!el)return;
+ const a=el.dataset.act,v=S&&curV();
+ const err=m=>{if(m)toast(m,'bad');renderAll(true)};
+ switch(a){
+  case'new':startGame(+el.dataset.v);break;
+  case'resume':if(running)begin();else if(load()){begin()}break;
+  case'menu':overlay('menu');break;
+  case'pause':paused=!paused;renderTop();break;
+  case'speed':speed=+el.dataset.v;paused=false;renderTop();break;
+  case'tab':tab=el.dataset.v;renderAll(true);break;
+  case'build':err(enqueueBuild(v,el.dataset.k));break;
+  case'cancelb':{const q=v.bq.splice(+el.dataset.i,1)[0];if(q)for(let j=0;j<3;j++)v.res[RES[j]]+=cost(q.k,q.L)[j];renderAll(true);break}
+  case'trmax':draft.train[el.dataset.u]=el.dataset.n;renderAll(true);break;
+  case'train':{const u=el.dataset.u,m=enqueueTrain(v,u,+draft.train[u]);if(!m)draft.train[u]='';err(m);break}
+  case'rep':{const r=S.reports.find(x=>x.id===+el.dataset.id);if(r){r.read=true;openRep=openRep===r.id?null:r.id}renderAll(true);break}
+  case'goto':cur=+el.dataset.id;selId=null;tab='build';renderAll(true);break;
+  case'sdall':draft.send[el.dataset.u]=el.dataset.n;renderTarget(true);break;
+  case'srall':draft.send['r'+el.dataset.r]=el.dataset.n;renderTarget(true);break;
+  case'transfer':{const T=V(selId),us=sendTotals(v,T),cg={w:0,c:0,i:0};
+   for(const r of RES)cg[r]=Math.min(Math.floor(v.res[r]),Math.max(0,Math.floor(+draft.send['r'+r]||0)));
+   if(!sumN(us)&&!(cg.w+cg.c+cg.i)){toast('Choose troops or resources first','bad');break}
+   if(transfer(v,T,us,cg)){toast(`Sent to ${T.name}, arriving in ${tm(travel(v,T,us))}`);draft.send={}}
+   renderAll(true);break}
+  case'clr':draft.send={};renderTarget(true);break;
+  case'alloff':draft.send={};for(const u of['axe','cav'])if(v.troops[u])draft.send[u]=v.troops[u];renderTarget(true);break;
+  case'scout1':{const T=V(selId);if(launch(v,T,{scout:1}))toast(`Scout sent to ${T.name}`);renderAll(true);break}
+  case'attack':{const T=V(selId),us=sendTotals(v,T);
+   if(!sumN(us)){toast('Choose some troops first','bad');break}
+   if(launch(v,T,us)){toast(`${sumN(us)} troops march on ${T.name}, arriving in ${tm(travel(v,T,us))}`);draft.send={}}
+   renderAll(true);break}
+ }
+});
+$('#map').addEventListener('click',e=>{
+ if(!S)return;const r=e.target.getBoundingClientRect(),cs=r.width/MAP;
+ const x=(e.clientX-r.left)/cs-.5,y=(e.clientY-r.top)/cs-.5;
+ let best=null,bd=1.1;for(const v of S.vs){const d=Math.hypot(v.x-x,v.y-y);if(d<bd){bd=d;best=v}}
+ selId=best?best.id:null;renderAll(true)});
+
+$('#legend').innerHTML=[['Your villages','#e3b04b'],...LORDS.slice(1).map(l=>[l.name,l.color]),['Barbarians',BARB]].map(([n,c])=>`<span style="--lc:${c}">${n}</span>`).join('');
+
+let last=performance.now(),n=0,lastSave=0;
+setInterval(()=>{
+ const now=performance.now();let dt=Math.min(10,(now-last)/1000);last=now;
+ if(!S||!running)return;
+ if(!paused&&!S.over){let rem=dt*speed;while(rem>0){const s=Math.min(.5,rem);step(s);rem-=s}}
+ if(S.over&&running){running=false;try{localStorage.removeItem(SAVE)}catch(e){}overlay('over');return}
+ drawMap();
+ if(++n%5===0&&!ptr){renderScene();renderTop();renderTabs();renderPanel();renderTarget()}
+ if(now-lastSave>8000){lastSave=now;save()}
+},100);
+window.addEventListener('beforeunload',()=>{if(S&&running)save()});
+overlay('start');
+</script>
+</body>
+</html>
