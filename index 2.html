@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Game Directory</title>
+<style>
+:root{--bg:#f6f4ef;--panel:#fff;--ink:#1d2127;--mute:#68707b;--line:#dcd8cf;--accent:#9a6b12;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1319;--panel:#161e27;--ink:#e8e2d2;--mute:#8f9aa6;--line:#2b3745;--accent:#cba24f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:max(32px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(32px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+main{max-width:640px;margin:0 auto}
+h1{margin:0 0 4px;font-size:1.6rem}
+.sub{margin:0 0 20px;color:var(--mute)}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+a.game{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:56px;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:inherit;text-decoration:none}
+a.game:hover,a.game:focus-visible{border-color:var(--accent);outline:none}
+a.game b{font-weight:600;overflow-wrap:anywhere}
+a.game small{color:var(--mute);overflow-wrap:anywhere;text-align:right}
+a.game::after{content:"→";color:var(--accent);flex:none;order:3}
+.note{color:var(--mute);padding:16px;border:1px dashed var(--line);border-radius:6px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Game Directory</h1>
+  <p class="sub" id="sub">Loading games…</p>
+  <ul id="list"></ul>
+  <p class="note" id="note" hidden></p>
+</main>
+<script>
+/* Settings.
+   On GitHub Pages the repo is detected from the address, so you can leave these blank.
+   Fill them in only if you use a custom domain or open this file from somewhere else. */
+const OWNER = "";
+const REPO = "";
+/* Fallback list, used only if GitHub cannot be reached. Example: ["snake.html", "embermark.html"] */
+const MANUAL = [];
+
+const $ = id => document.getElementById(id);
+const pretty = f => f.replace(/\.html?$/i, "").replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+function repoInfo() {
+  if (OWNER && REPO) return { owner: OWNER, repo: REPO };
+  const h = location.hostname;
+  if (h.endsWith(".github.io")) {
+    const owner = h.split(".")[0];
+    const seg = location.pathname.split("/")[1];
+    return { owner, repo: seg && !/\.html?$/i.test(seg) ? seg : owner + ".github.io" };
+  }
+  return null;
+}
+
+async function listFiles() {
+  const info = repoInfo();
+  if (info) {
+    try {
+      const r = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/contents/`);
+      if (!r.ok) throw new Error(r.status);
+      const items = await r.json();
+      return items.filter(x => x.type === "file" && /\.html?$/i.test(x.name) && x.name.toLowerCase() !== "index.html").map(x => x.name);
+    } catch (e) { /* fall through to the manual list */ }
+  }
+  return MANUAL.filter(n => n.toLowerCase() !== "index.html");
+}
+
+async function titleOf(file) {
+  try {
+    const r = await fetch(encodeURI(file));
+    const m = (await r.text()).match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (m && m[1].trim()) return m[1].trim();
+  } catch (e) {}
+  return pretty(file);
+}
+
+(async () => {
+  const files = await listFiles();
+  if (!files.length) {
+    $("sub").textContent = "No games found.";
+    const n = $("note");
+    n.hidden = false;
+    n.textContent = repoInfo()
+      ? "Add .html files next to this page in your repository. If the repository is private, or GitHub is unreachable, list the files in the MANUAL array at the top of this file's script."
+      : "Could not detect the repository. Set OWNER and REPO at the top of this file's script, or list the files in MANUAL.";
+    return;
+  }
+  const games = await Promise.all(files.map(async f => ({ file: f, name: await titleOf(f) })));
+  games.sort((a, b) => a.name.localeCompare(b.name));
+  $("sub").textContent = games.length + (games.length === 1 ? " game" : " games");
+  const ul = $("list");
+  for (const g of games) {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.className = "game";
+    a.href = encodeURI(g.file);
+    const b = document.createElement("b"); b.textContent = g.name;
+    const s = document.createElement("small"); s.textContent = g.file;
+    a.append(b, s);
+    li.appendChild(a);
+    ul.appendChild(li);
+  }
+})();
+</script>
+</body>
+</html>
